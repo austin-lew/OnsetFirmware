@@ -1,0 +1,10 @@
+# Build directory
+/build/
+
+# IDE and editor settings
+.vscode/
+.settings/
+.clangd
+
+# STM32CubeMX metadata
+.mxproject
