@@ -25,7 +25,7 @@ typedef enum{
 }limitswitch_event_t;
 
 typedef enum{
-  LIMITSWITCH_1 = 0,
+  LIMITSWITCH_1,
   LIMITSWITCH_2,
   LIMITSWITCH_3,
   LIMITSWITCH_4
@@ -33,7 +33,16 @@ typedef enum{
 
 typedef void (*limitswitch_callback_t)(limitswitch_event_t event);
 
-bool register_limitswitch_callback(limitswitch_id_t limitswitch_id, limitswitch_callback_t callback);
+typedef struct {
+  GPIO_TypeDef *gpio_port;
+  uint16_t gpio_pin;
+  GPIO_PinState pressed_state;
+  limitswitch_callback_t callback;
+} limitswitch_config_t;
+
+bool register_limitswitch(limitswitch_id_t limitswitch_id,
+                          limitswitch_config_t config);
+
 
 #ifdef __cplusplus
 }

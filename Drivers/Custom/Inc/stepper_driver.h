@@ -26,19 +26,21 @@ typedef enum{
   DIR_CCW = 1
 } stepper_dir_t;
 
-// Stepper motor struct
-typedef struct{
-  uint16_t            step_count;
-  uint16_t            step_count_setpoint;
-  stepper_dir_t       direction;
-  TIM_HandleTypeDef*  timer;
-  uint32_t            timer_channel;
-} stepper_t;
 
+void stepper_init(TIM_HandleTypeDef* timer,
+                  uint32_t timer_channel,
+                  uint32_t max_steps_per_second,
+                  uint32_t max_steps_per_second2,
+                  GPIO_TypeDef* dir_gpio_port,
+                  uint16_t dir_gpio_pin);
 
-bool stepper_absolute_move(stepper_t* stepper, uint16_t steps);
+void stepper_home();
 
-bool stepper_emergency_stop(stepper_t* stepper);
+void stepper_tare();
+
+bool stepper_absolute_move(uint16_t steps);
+
+bool stepper_emergency_stop(void);
 
 #ifdef __cplusplus
 }

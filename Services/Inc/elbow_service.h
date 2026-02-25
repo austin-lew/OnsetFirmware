@@ -25,9 +25,7 @@ typedef enum{
   MOVING
 } elbow_state_t;
 
-extern elbow_state_t elbow_state;
 
-void init_elbow_service(osMessageQueueId_t queue_handle);
 void start_elbow_service(void *argument);
 
 #ifdef __cplusplus

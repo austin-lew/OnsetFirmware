@@ -27,6 +27,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "freertos_handles.h"
 #include "heartbeat_service.h"
 #include "elbow_service.h"
 /* USER CODE END Includes */
@@ -70,10 +71,15 @@ const osThreadAttr_t hb_service_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
-/* Definitions for limitswitch1_queue */
-osMessageQueueId_t limitswitch1_queueHandle;
-const osMessageQueueAttr_t limitswitch1_queue_attributes = {
-  .name = "limitswitch1_queue"
+/* Definitions for serial_to_elbow */
+osMessageQueueId_t serial_to_elbowHandle;
+const osMessageQueueAttr_t serial_to_elbow_attributes = {
+  .name = "serial_to_elbow"
+};
+/* Definitions for elbow_to_serial */
+osMessageQueueId_t elbow_to_serialHandle;
+const osMessageQueueAttr_t elbow_to_serial_attributes = {
+  .name = "elbow_to_serial"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -110,12 +116,14 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
-  /* creation of limitswitch1_queue */
-  limitswitch1_queueHandle = osMessageQueueNew (1, sizeof(uint16_t), &limitswitch1_queue_attributes);
+  /* creation of serial_to_elbow */
+  serial_to_elbowHandle = osMessageQueueNew (16, sizeof(serial_to_elbow_msg_t), &serial_to_elbow_attributes);
+
+  /* creation of elbow_to_serial */
+  elbow_to_serialHandle = osMessageQueueNew (16, sizeof(elbow_to_serial_msg_t), &elbow_to_serial_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
-  init_elbow_service(limitswitch1_queueHandle);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
