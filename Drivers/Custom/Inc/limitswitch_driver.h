@@ -20,15 +20,14 @@ extern "C" {
 #include <stdbool.h>
 
 typedef enum{
-    LIMITSWITCH_PRESSED,
-    LIMITSWITCH_RELEASED
+  LIMITSWITCH_PRESSED,
+  LIMITSWITCH_RELEASED
 }limitswitch_event_t;
 
 typedef enum{
   LIMITSWITCH_1,
   LIMITSWITCH_2,
-  LIMITSWITCH_3,
-  LIMITSWITCH_4
+  LIMITSWITCH_3
 } limitswitch_id_t;
 
 typedef void (*limitswitch_callback_t)(limitswitch_event_t event);

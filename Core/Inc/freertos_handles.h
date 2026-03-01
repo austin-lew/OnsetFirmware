@@ -34,10 +34,10 @@ extern osMessageQueueId_t serial_to_elbowHandle;
 /* Elbow to Serial Message Passing       -------------------------------------*/
 
 typedef enum{
+    STATUS_NEEDS_HOME,
     STATUS_HOMING,
     STATUS_HOME_ERROR,
     STATUS_HOME_SUCCESS,
-    STATUS_NEEDS_HOME_ERROR,
     STATUS_MOVING,
     STATUS_MOVE_SUCCESS,
     STATUS_MOVE_ERROR,

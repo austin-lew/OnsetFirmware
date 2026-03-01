@@ -9,7 +9,7 @@
 #include "limitswitch_driver.h"
 #include <stdint.h>
 
-#define NUM_SWITCHES (4)
+#define NUM_SWITCHES (3)
 
 static limitswitch_config_t limitswitch_configs[NUM_SWITCHES] = {0};
 

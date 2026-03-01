@@ -65,7 +65,11 @@
   */
 
 /* USER CODE BEGIN EXPORTED_TYPES */
-
+typedef struct{
+    uint16_t head;
+    uint16_t tail;
+    uint8_t buffer[APP_RX_DATA_SIZE];
+} circular_buffer_t;
 /* USER CODE END EXPORTED_TYPES */
 
 /**
@@ -94,7 +98,7 @@
 extern USBD_CDC_ItfTypeDef USBD_Interface_fops_FS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
-
+extern volatile circular_buffer_t rx_buffer;
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**

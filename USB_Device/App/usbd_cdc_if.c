@@ -109,7 +109,11 @@ uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
-
+volatile circular_buffer_t rx_buffer = {
+  .head = 0,
+  .tail = 0,
+  .buffer = {0}
+};
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**
@@ -261,6 +265,17 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
+  for (uint32_t i = 0; i < *Len; i++){
+    uint16_t next_head = (uint16_t)((rx_buffer.head + 1U) % APP_RX_DATA_SIZE);
+
+    if (next_head == rx_buffer.tail) {
+      continue;
+    }
+
+    rx_buffer.buffer[rx_buffer.head] = Buf[i];
+    rx_buffer.head = next_head;
+  }
+
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);

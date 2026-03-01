@@ -1,15 +1,15 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    elbow_service.h
+  * @file    serial_service.h
   * @brief   This file contains all the function prototypes for
-  *          the elbow_service.c file
+  *          the serial_service.c file
   ******************************************************************************
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __ELBOW_SERVICE_H__
-#define __ELBOW_SERVICE_H__
+#ifndef __SERIAL_SERVICE_H__
+#define __SERIAL_SERVICE_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,12 +17,12 @@ extern "C" {
 
 #include "cmsis_os2.h"
 
-void start_elbow_service(void *argument);
+void start_serial_service(void *argument);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __ELBOW_SERVICE_H__ */
+#endif /* __SERIAL_SERVICE_H__ */
 
 

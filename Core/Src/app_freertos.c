@@ -30,6 +30,7 @@
 #include "freertos_handles.h"
 #include "heartbeat_service.h"
 #include "elbow_service.h"
+#include "serial_service.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,6 +72,13 @@ const osThreadAttr_t hb_service_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
+/* Definitions for serial_service */
+osThreadId_t serial_serviceHandle;
+const osThreadAttr_t serial_service_attributes = {
+  .name = "serial_service",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 128 * 4
+};
 /* Definitions for serial_to_elbow */
 osMessageQueueId_t serial_to_elbowHandle;
 const osMessageQueueAttr_t serial_to_elbow_attributes = {
@@ -90,6 +98,7 @@ const osMessageQueueAttr_t elbow_to_serial_attributes = {
 void start_default_task(void *argument);
 extern void start_elbow_service(void *argument);
 extern void start_heartbeat_service(void *argument);
+extern void start_serial_service(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -135,6 +144,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of hb_service */
   hb_serviceHandle = osThreadNew(start_heartbeat_service, NULL, &hb_service_attributes);
+
+  /* creation of serial_service */
+  serial_serviceHandle = osThreadNew(start_serial_service, NULL, &serial_service_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

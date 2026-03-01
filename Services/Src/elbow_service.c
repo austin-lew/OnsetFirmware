@@ -11,6 +11,14 @@
 #define ELBOW_REDUCTION (12)
 #define STEPS_PER_REV (200 * MICROSTEP * ELBOW_REDUCTION)
 
+// Enum for elbow motor states
+typedef enum{
+  NEEDS_HOME,
+  HOMING,
+  IDLE,
+  MOVING
+} elbow_state_t;
+
 static elbow_state_t state;
 typedef struct {
     uint16_t move_target_steps;
@@ -68,7 +76,7 @@ static elbow_state_t handle_needs_home(void){
         return HOMING;
     }
 
-    send_serial_msg(STATUS_NEEDS_HOME_ERROR, 0);
+    send_serial_msg(STATUS_NEEDS_HOME, 0);
     return NEEDS_HOME;
 }
 
