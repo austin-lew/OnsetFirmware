@@ -19,9 +19,9 @@ extern "C" {
 
 /* Serial to Elbow Message Passing       -------------------------------------*/
 typedef enum{
-    CMD_HOME,
-    CMD_MOVE,
-    CMD_STOP
+    CMD_HOME=0,
+    CMD_MOVE=1,
+    CMD_STOP=2
 } serial_to_elbow_cmd_t;
 
 typedef struct{
@@ -34,13 +34,13 @@ extern osMessageQueueId_t serial_to_elbowHandle;
 /* Elbow to Serial Message Passing       -------------------------------------*/
 
 typedef enum{
-    STATUS_NEEDS_HOME,
-    STATUS_HOMING,
-    STATUS_HOME_ERROR,
-    STATUS_HOME_SUCCESS,
-    STATUS_MOVING,
-    STATUS_MOVE_SUCCESS,
-    STATUS_MOVE_ERROR,
+    STATUS_NEEDS_HOME=0,
+    STATUS_HOMING=1,
+    STATUS_HOME_ERROR=2,
+    STATUS_HOME_SUCCESS=3,
+    STATUS_MOVING=4,
+    STATUS_MOVE_SUCCESS=5,
+    STATUS_MOVE_ERROR=6,
 } elbow_to_serial_status_t;
 
 typedef struct{
