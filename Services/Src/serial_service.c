@@ -32,7 +32,14 @@ volatile serial_state_t state = SERIAL_IDLE;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 static char latest_rx_packet[APP_RX_DATA_SIZE];
+static volatile uint32_t limitswitch_change_counter = 0U;
+static uint32_t last_transmitted_limitswitch_change_counter = 0U;
 
+/**
+ * @brief Returns whether a USB CDC TX transfer is currently in flight.
+ *
+ * @return true when USB CDC cannot accept a new transmit request.
+ */
 static bool usb_tx_busy(void){
     USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
 
@@ -43,10 +50,21 @@ static bool usb_tx_busy(void){
     return (hcdc->TxState != 0U);
 }
 
+/**
+ * @brief Checks whether unread bytes are available in the USB RX ring buffer.
+ *
+ * @return true when head and tail differ.
+ */
 static bool rx_buffer_has_data(void){
     return (rx_buffer.head != rx_buffer.tail);
 }
 
+/**
+ * @brief Pops one byte from the USB RX ring buffer.
+ *
+ * @param byte Destination for the popped byte.
+ * @return true when a byte was read.
+ */
 static bool pop_rx_byte(uint8_t *byte){
     if (!rx_buffer_has_data()) {
         return false;
@@ -58,6 +76,13 @@ static bool pop_rx_byte(uint8_t *byte){
     return true;
 }
 
+/**
+ * @brief Drains RX bytes and keeps the most recent complete <...> frame.
+ *
+ * @param packet Output buffer for the latest complete frame.
+ * @param packet_size Size of @p packet in bytes.
+ * @return true when at least one complete frame was found.
+ */
 static bool consume_latest_rx_packet(char *packet, uint16_t packet_size){
     bool in_frame = false;
     bool found_packet = false;
@@ -99,6 +124,11 @@ static bool consume_latest_rx_packet(char *packet, uint16_t packet_size){
     return found_packet;
 }
 
+/**
+ * @brief Parses a framed command and forwards it to the elbow service queue.
+ *
+ * @param packet Null-terminated frame in the form <...>.
+ */
 static void parse_rx_packet(char *packet){
     switch(packet[1]){
         case 'H':
@@ -109,7 +139,6 @@ static void parse_rx_packet(char *packet){
             osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
             break;
         case 'M':
-            // match format <M,VALUE>
             float value = 0;
             if (sscanf(packet, "<M,%f>", &value) == 1) {
                 serial_to_elbow_msg_t msg = {
@@ -122,12 +151,24 @@ static void parse_rx_packet(char *packet){
     }
 }
 
+/**
+ * @brief Updates switch 2 status on limit switch interrupt event.
+ *
+ * @param event New switch event.
+ */
 static void limitswitch2_event_callback(limitswitch_event_t event){
     tx_data.switch2_status = event;
+    limitswitch_change_counter++;
 }
 
+/**
+ * @brief Updates switch 3 status on limit switch interrupt event.
+ *
+ * @param event New switch event.
+ */
 static void limitswitch3_event_callback(limitswitch_event_t event){
     tx_data.switch3_status = event;
+    limitswitch_change_counter++;
 }
 
 limitswitch_config_t limitswitch2_config = {
@@ -144,6 +185,11 @@ limitswitch_config_t limitswitch3_config = {
     .callback = limitswitch3_event_callback
 };
 
+/**
+ * @brief Initializes serial service dependencies and initial TX status state.
+ *
+ * @return Initial serial service state.
+ */
 static serial_state_t init_serial_service(){
     register_limitswitch(LIMITSWITCH_2, limitswitch2_config);
     register_limitswitch(LIMITSWITCH_3, limitswitch3_config);
@@ -151,9 +197,13 @@ static serial_state_t init_serial_service(){
     tx_data.switch2_status = (HAL_GPIO_ReadPin(LIMIT_SW_2_GPIO_Port, LIMIT_SW_2_Pin) == limitswitch2_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
     tx_data.switch3_status = (HAL_GPIO_ReadPin(LIMIT_SW_3_GPIO_Port, LIMIT_SW_3_Pin) == limitswitch3_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
     tx_data.elbow_status = STATUS_NEEDS_HOME;
+    last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
     return SERIAL_IDLE;
 }
 
+/**
+ * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow>.
+ */
 static void update_tx_buffer(void){
     limitswitch_event_t switch2_status = tx_data.switch2_status;
     limitswitch_event_t switch3_status = tx_data.switch3_status;
@@ -181,11 +231,21 @@ static void update_tx_buffer(void){
     tx_buffer.size = payload_len;
 }
 
+/**
+ * @brief Executes one iteration of the serial service state machine.
+ *
+ * @param state Current state.
+ * @return Next state.
+ */
 static serial_state_t state_machine(serial_state_t state){
     switch(state){
         case SERIAL_IDLE:
             if (rx_buffer_has_data()) {
                 return SERIAL_RX;
+            }
+
+            if (limitswitch_change_counter != last_transmitted_limitswitch_change_counter) {
+                return SERIAL_TX;
             }
 
             if (osMessageQueueGetCount(elbow_to_serialHandle) > 0) {
@@ -213,6 +273,8 @@ static serial_state_t state_machine(serial_state_t state){
             if (CDC_Transmit_FS((uint8_t *)(void *)tx_buffer.buffer, tx_buffer.size) != USBD_OK) {
                 return SERIAL_TX;
             }
+
+            last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
             
             return SERIAL_IDLE;
         default:
@@ -220,7 +282,13 @@ static serial_state_t state_machine(serial_state_t state){
     }
 }
 
+/**
+ * @brief Serial service task entry point.
+ *
+ * @param argument Unused RTOS task argument.
+ */
 void start_serial_service(void *argument){
+    (void)argument;
     state = init_serial_service();
     while (true) {
         state = state_machine(state);
