@@ -23,12 +23,20 @@ This is an ASCII based protocol. Each packet starts with a `<` and ends with a `
 	- `VALUE` is parsed as a float using `sscanf("<M,%f>", ...)`
 	- Action: Sends `CMD_MOVE` with parsed value to the elbow service queue
 
+- `<P,VALUE>`
+	- Meaning: Precharge power command
+	- `VALUE` is parsed as an integer using `sscanf("<P,%d>", ...)`
+	- Action:
+		- `VALUE == 0` sends `CMD_OFF` to the precharge service queue
+		- `VALUE != 0` sends `CMD_ON` to the precharge service queue
+
 ### RX parser behavior
 - Incoming bytes are read from the USB RX ring buffer.
 - Parser scans byte-by-byte for framed messages.
 - If multiple complete packets are present in one drain cycle, only the most recent complete packet is kept and parsed.
 - Bytes outside frames are ignored.
 - Unknown packet types are ignored.
+- Alphabetic characters are normalized to uppercase before parsing (for example `<h>` and `<p,1>` are accepted).
 
 ### RX buffer policy
 - Ring buffer policy is drop-new-on-full.
@@ -38,7 +46,7 @@ This is an ASCII based protocol. Each packet starts with a `<` and ends with a `
 ## TX (STM32 -> Host)
 
 ### Packet format
-- `<SW2,SW3,ELBOW_STATUS>`
+- `<SW2,SW3,ELBOW_STATUS,PRECHARGE_STATUS>`
 - All fields are emitted as unsigned integer ASCII values.
 
 ### Field definitions
@@ -59,6 +67,11 @@ This is an ASCII based protocol. Each packet starts with a `<` and ends with a `
 	- `5` = `STATUS_MOVE_SUCCESS`
 	- `6` = `STATUS_MOVE_ERROR`
 
+- `PRECHARGE_STATUS`: `precharge_to_serial_status_t`
+	- `0` = `STATUS_OFF`
+	- `1` = `STATUS_PRECHARGE_ON`
+	- `2` = `STATUS_MAIN_POWER_ON`
+
 ### TX behavior
 - TX is non-blocking and checks CDC busy state before starting a new transfer.
 - If USB is busy, TX retries in later service iterations.
@@ -67,8 +80,10 @@ This is an ASCII based protocol. Each packet starts with a `<` and ends with a `
 - Host -> STM32
 	- `<H>`
 	- `<M,1.5708>`
+	- `<P,1>`
+	- `<P,0>`
 
 - STM32 -> Host
-	- `<1,1,0>`
-	- `<0,1,4>`
-	- `<0,0,5>`
+	- `<1,1,0,0>`
+	- `<0,1,4,1>`
+	- `<0,0,5,2>`
