@@ -7,9 +7,9 @@
 
 void start_heartbeat_service(void *argument)
 {
-  while(true)
+  while (true)
   {
     HAL_GPIO_TogglePin(HEARTBEAT_LED_GPIO_Port, HEARTBEAT_LED_Pin);
-    osDelay(HEARTBEAT_PERIOD_TICKS/2);
+    osDelay(HEARTBEAT_PERIOD_TICKS / 2);
   }
 }

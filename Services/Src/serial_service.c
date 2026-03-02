@@ -8,22 +8,25 @@
 #include <string.h>
 #include <ctype.h>
 
-typedef enum{
+typedef enum
+{
     SERIAL_IDLE,
     SERIAL_RX,
     SERIAL_TX
-}serial_state_t;
+} serial_state_t;
 
-typedef struct{
+typedef struct
+{
     volatile limitswitch_event_t switch2_status;
     volatile limitswitch_event_t switch3_status;
     elbow_to_serial_status_t elbow_status;
     precharge_to_serial_status_t precharge_status;
-}tx_data_t;
+} tx_data_t;
 
 tx_data_t tx_data;
 
-typedef struct {
+typedef struct
+{
     char buffer[APP_TX_DATA_SIZE];
     uint16_t size;
 } tx_buffer_t;
@@ -42,10 +45,12 @@ static uint32_t last_transmitted_limitswitch_change_counter = 0U;
  *
  * @return true when USB CDC cannot accept a new transmit request.
  */
-static bool usb_tx_busy(void){
+static bool usb_tx_busy(void)
+{
     USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
 
-    if (hcdc == NULL) {
+    if (hcdc == NULL)
+    {
         return true;
     }
 
@@ -57,7 +62,8 @@ static bool usb_tx_busy(void){
  *
  * @return true when head and tail differ.
  */
-static bool rx_buffer_has_data(void){
+static bool rx_buffer_has_data(void)
+{
     return (rx_buffer.head != rx_buffer.tail);
 }
 
@@ -67,8 +73,10 @@ static bool rx_buffer_has_data(void){
  * @param byte Destination for the popped byte.
  * @return true when a byte was read.
  */
-static bool pop_rx_byte(uint8_t *byte){
-    if (!rx_buffer_has_data()) {
+static bool pop_rx_byte(uint8_t *byte)
+{
+    if (!rx_buffer_has_data())
+    {
         return false;
     }
 
@@ -85,42 +93,50 @@ static bool pop_rx_byte(uint8_t *byte){
  * @param packet_size Size of @p packet in bytes.
  * @return true when at least one complete frame was found.
  */
-static bool consume_latest_rx_packet(char *packet, uint16_t packet_size){
+static bool consume_latest_rx_packet(char *packet, uint16_t packet_size)
+{
     bool in_frame = false;
     bool found_packet = false;
     uint16_t frame_len = 0;
     uint8_t byte = 0;
 
-    if ((packet == NULL) || (packet_size < 3U)) {
+    if ((packet == NULL) || (packet_size < 3U))
+    {
         return false;
     }
 
-    while (pop_rx_byte(&byte)) {
-        if (byte == '<') {
+    while (pop_rx_byte(&byte))
+    {
+        if (byte == '<')
+        {
             in_frame = true;
             frame_len = 0;
             packet[frame_len++] = '<';
             continue;
         }
 
-        if (!in_frame) {
+        if (!in_frame)
+        {
             continue;
         }
 
-        if (frame_len >= (uint16_t)(packet_size - 1U)) {
+        if (frame_len >= (uint16_t)(packet_size - 1U))
+        {
             in_frame = false;
             frame_len = 0;
             continue;
         }
 
         // capitalize all letters
-        if (isalpha(byte)) {
+        if (isalpha(byte))
+        {
             byte = (uint8_t)toupper((int)byte);
         }
 
         packet[frame_len++] = (char)byte;
 
-        if (byte == '>') {
+        if (byte == '>')
+        {
             packet[frame_len] = '\0';
             found_packet = true;
             in_frame = false;
@@ -136,39 +152,41 @@ static bool consume_latest_rx_packet(char *packet, uint16_t packet_size){
  *
  * @param packet Null-terminated frame in the form <...>.
  */
-static void parse_rx_packet(char *packet){
-    switch(packet[1]){
-        case 'H':{
+static void parse_rx_packet(char *packet)
+{
+    switch (packet[1])
+    {
+    case 'H':
+    {
+        serial_to_elbow_msg_t msg = {
+            .command = CMD_HOME,
+            .value = 0};
+        osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
+        break;
+    }
+    case 'M':
+    {
+        float value = 0;
+        if (sscanf(packet, "<M,%f>", &value) == 1)
+        {
             serial_to_elbow_msg_t msg = {
-                .command = CMD_HOME,
-                .value = 0
-            };
+                .command = CMD_MOVE,
+                .value = value};
             osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
-            break;
-
         }
-        case 'M':{
-            float value = 0;
-            if (sscanf(packet, "<M,%f>", &value) == 1) {
-                serial_to_elbow_msg_t msg = {
-                    .command = CMD_MOVE,
-                    .value = value
-                };
-                osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
-            }
-            break;
-
+        break;
+    }
+    case 'P':
+    {
+        int value = 0;
+        if (sscanf(packet, "<P,%d>", &value) == 1)
+        {
+            serial_to_precharge_msg_t msg = {
+                .command = (value == 0) ? CMD_OFF : CMD_ON};
+            osMessageQueuePut(serial_to_prechargeHandle, &msg, 0, 0);
         }
-        case 'P':{
-            int value = 0;
-            if (sscanf(packet, "<P,%d>", &value) == 1) {
-                serial_to_precharge_msg_t msg = {
-                    .command = (value == 0) ? CMD_OFF : CMD_ON
-                };
-                osMessageQueuePut(serial_to_prechargeHandle, &msg, 0, 0);
-            }
-            break;
-        }
+        break;
+    }
     }
 }
 
@@ -177,7 +195,8 @@ static void parse_rx_packet(char *packet){
  *
  * @param event New switch event.
  */
-static void limitswitch2_event_callback(limitswitch_event_t event){
+static void limitswitch2_event_callback(limitswitch_event_t event)
+{
     tx_data.switch2_status = event;
     limitswitch_change_counter++;
 }
@@ -187,7 +206,8 @@ static void limitswitch2_event_callback(limitswitch_event_t event){
  *
  * @param event New switch event.
  */
-static void limitswitch3_event_callback(limitswitch_event_t event){
+static void limitswitch3_event_callback(limitswitch_event_t event)
+{
     tx_data.switch3_status = event;
     limitswitch_change_counter++;
 }
@@ -196,22 +216,21 @@ limitswitch_config_t limitswitch2_config = {
     .gpio_port = LIMIT_SW_2_GPIO_Port,
     .gpio_pin = LIMIT_SW_2_Pin,
     .pressed_state = GPIO_PIN_RESET,
-    .callback = limitswitch2_event_callback
-};
+    .callback = limitswitch2_event_callback};
 
 limitswitch_config_t limitswitch3_config = {
     .gpio_port = LIMIT_SW_3_GPIO_Port,
     .gpio_pin = LIMIT_SW_3_Pin,
     .pressed_state = GPIO_PIN_RESET,
-    .callback = limitswitch3_event_callback
-};
+    .callback = limitswitch3_event_callback};
 
 /**
  * @brief Initializes serial service dependencies and initial TX status state.
  *
  * @return Initial serial service state.
  */
-static serial_state_t init_serial_service(){
+static serial_state_t init_serial_service()
+{
     register_limitswitch(LIMITSWITCH_2, limitswitch2_config);
     register_limitswitch(LIMITSWITCH_3, limitswitch3_config);
 
@@ -226,7 +245,8 @@ static serial_state_t init_serial_service(){
 /**
  * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow,precharge>.
  */
-static void update_tx_buffer(void){
+static void update_tx_buffer(void)
+{
     limitswitch_event_t switch2_status = tx_data.switch2_status;
     limitswitch_event_t switch3_status = tx_data.switch3_status;
     elbow_to_serial_status_t elbow_status = tx_data.elbow_status;
@@ -241,15 +261,16 @@ static void update_tx_buffer(void){
                            (unsigned int)elbow_status,
                            (unsigned int)precharge_status);
 
-    if (written <= 0) {
+    if (written <= 0)
+    {
         tx_buffer.size = 0;
         tx_buffer.buffer[0] = '\0';
         return;
     }
 
     uint16_t payload_len = (written >= (int)sizeof(local_buffer))
-        ? (uint16_t)(sizeof(local_buffer) - 1U)
-        : (uint16_t)written;
+                               ? (uint16_t)(sizeof(local_buffer) - 1U)
+                               : (uint16_t)written;
 
     memcpy((void *)tx_buffer.buffer, local_buffer, (size_t)payload_len + 1U);
     tx_buffer.size = payload_len;
@@ -260,21 +281,26 @@ static void update_tx_buffer(void){
  *
  * @return Next serial state.
  */
-static serial_state_t handle_idle(void){
-    if (rx_buffer_has_data()) {
+static serial_state_t handle_idle(void)
+{
+    if (rx_buffer_has_data())
+    {
         return SERIAL_RX;
     }
 
-    if (limitswitch_change_counter != last_transmitted_limitswitch_change_counter) {
+    if (limitswitch_change_counter != last_transmitted_limitswitch_change_counter)
+    {
         return SERIAL_TX;
     }
 
-    if (osMessageQueueGetCount(elbow_to_serialHandle) > 0) {
+    if (osMessageQueueGetCount(elbow_to_serialHandle) > 0)
+    {
         osMessageQueueGet(elbow_to_serialHandle, &tx_data.elbow_status, NULL, 0);
         return SERIAL_TX;
     }
 
-    if (osMessageQueueGetCount(precharge_to_serialHandle) > 0) {
+    if (osMessageQueueGetCount(precharge_to_serialHandle) > 0)
+    {
         osMessageQueueGet(precharge_to_serialHandle, &tx_data.precharge_status, NULL, 0);
         return SERIAL_TX;
     }
@@ -287,8 +313,10 @@ static serial_state_t handle_idle(void){
  *
  * @return Next serial state.
  */
-static serial_state_t handle_rx(void){
-    if (!consume_latest_rx_packet(latest_rx_packet, sizeof(latest_rx_packet))) {
+static serial_state_t handle_rx(void)
+{
+    if (!consume_latest_rx_packet(latest_rx_packet, sizeof(latest_rx_packet)))
+    {
         return SERIAL_IDLE;
     }
 
@@ -301,18 +329,22 @@ static serial_state_t handle_rx(void){
  *
  * @return Next serial state.
  */
-static serial_state_t handle_tx(void){
-    if (usb_tx_busy()) {
+static serial_state_t handle_tx(void)
+{
+    if (usb_tx_busy())
+    {
         return SERIAL_TX;
     }
 
     update_tx_buffer();
 
-    if (tx_buffer.size == 0U) {
+    if (tx_buffer.size == 0U)
+    {
         return SERIAL_IDLE;
     }
 
-    if (CDC_Transmit_FS((uint8_t *)(void *)tx_buffer.buffer, tx_buffer.size) != USBD_OK) {
+    if (CDC_Transmit_FS((uint8_t *)(void *)tx_buffer.buffer, tx_buffer.size) != USBD_OK)
+    {
         return SERIAL_TX;
     }
 
@@ -326,16 +358,18 @@ static serial_state_t handle_tx(void){
  * @param state Current state.
  * @return Next state.
  */
-static serial_state_t state_machine(serial_state_t state){
-    switch(state){
-        case SERIAL_IDLE:
-            return handle_idle();
-        case SERIAL_RX:
-            return handle_rx();
-        case SERIAL_TX:
-            return handle_tx();
-        default:
-            return SERIAL_IDLE;
+static serial_state_t state_machine(serial_state_t state)
+{
+    switch (state)
+    {
+    case SERIAL_IDLE:
+        return handle_idle();
+    case SERIAL_RX:
+        return handle_rx();
+    case SERIAL_TX:
+        return handle_tx();
+    default:
+        return SERIAL_IDLE;
     }
 }
 
@@ -344,10 +378,12 @@ static serial_state_t state_machine(serial_state_t state){
  *
  * @param argument Unused RTOS task argument.
  */
-void start_serial_service(void *argument){
+void start_serial_service(void *argument)
+{
     (void)argument;
     state = init_serial_service();
-    while (true) {
+    while (true)
+    {
         state = state_machine(state);
         osDelay(10);
     }
