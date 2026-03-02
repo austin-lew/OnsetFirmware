@@ -31,6 +31,7 @@
 #include "heartbeat_service.h"
 #include "elbow_service.h"
 #include "serial_service.h"
+#include "precharge_service.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,19 +64,26 @@ osThreadId_t elbow_serviceHandle;
 const osThreadAttr_t elbow_service_attributes = {
   .name = "elbow_service",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
+  .stack_size = 256 * 4
 };
-/* Definitions for hb_service */
-osThreadId_t hb_serviceHandle;
-const osThreadAttr_t hb_service_attributes = {
-  .name = "hb_service",
+/* Definitions for heartbeat_service */
+osThreadId_t heartbeat_serviceHandle;
+const osThreadAttr_t heartbeat_service_attributes = {
+  .name = "heartbeat_service",
   .priority = (osPriority_t) osPriorityNormal,
-  .stack_size = 128 * 4
+  .stack_size = 64 * 4
 };
 /* Definitions for serial_service */
 osThreadId_t serial_serviceHandle;
 const osThreadAttr_t serial_service_attributes = {
   .name = "serial_service",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 512 * 4
+};
+/* Definitions for precharge_service */
+osThreadId_t precharge_serviceHandle;
+const osThreadAttr_t precharge_service_attributes = {
+  .name = "precharge_service",
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
@@ -89,6 +97,16 @@ osMessageQueueId_t elbow_to_serialHandle;
 const osMessageQueueAttr_t elbow_to_serial_attributes = {
   .name = "elbow_to_serial"
 };
+/* Definitions for serial_to_precharge */
+osMessageQueueId_t serial_to_prechargeHandle;
+const osMessageQueueAttr_t serial_to_precharge_attributes = {
+  .name = "serial_to_precharge"
+};
+/* Definitions for precharge_to_serial */
+osMessageQueueId_t precharge_to_serialHandle;
+const osMessageQueueAttr_t precharge_to_serial_attributes = {
+  .name = "precharge_to_serial"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -99,6 +117,7 @@ void start_default_task(void *argument);
 extern void start_elbow_service(void *argument);
 extern void start_heartbeat_service(void *argument);
 extern void start_serial_service(void *argument);
+extern void start_precharge_service(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -131,6 +150,12 @@ void MX_FREERTOS_Init(void) {
   /* creation of elbow_to_serial */
   elbow_to_serialHandle = osMessageQueueNew (16, sizeof(elbow_to_serial_msg_t), &elbow_to_serial_attributes);
 
+  /* creation of serial_to_precharge */
+  serial_to_prechargeHandle = osMessageQueueNew (16, sizeof(serial_to_precharge_msg_t), &serial_to_precharge_attributes);
+
+  /* creation of precharge_to_serial */
+  precharge_to_serialHandle = osMessageQueueNew (16, sizeof(precharge_to_serial_msg_t), &precharge_to_serial_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -142,11 +167,14 @@ void MX_FREERTOS_Init(void) {
   /* creation of elbow_service */
   elbow_serviceHandle = osThreadNew(start_elbow_service, NULL, &elbow_service_attributes);
 
-  /* creation of hb_service */
-  hb_serviceHandle = osThreadNew(start_heartbeat_service, NULL, &hb_service_attributes);
+  /* creation of heartbeat_service */
+  heartbeat_serviceHandle = osThreadNew(start_heartbeat_service, NULL, &heartbeat_service_attributes);
 
   /* creation of serial_service */
   serial_serviceHandle = osThreadNew(start_serial_service, NULL, &serial_service_attributes);
+
+  /* creation of precharge_service */
+  precharge_serviceHandle = osThreadNew(start_precharge_service, NULL, &precharge_service_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

@@ -6,6 +6,7 @@
 #include "main.h"
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 typedef enum{
     SERIAL_IDLE,
@@ -17,6 +18,7 @@ typedef struct{
     volatile limitswitch_event_t switch2_status;
     volatile limitswitch_event_t switch3_status;
     elbow_to_serial_status_t elbow_status;
+    precharge_to_serial_status_t precharge_status;
 }tx_data_t;
 
 tx_data_t tx_data;
@@ -111,6 +113,11 @@ static bool consume_latest_rx_packet(char *packet, uint16_t packet_size){
             continue;
         }
 
+        // capitalize all letters
+        if (isalpha(byte)) {
+            byte = (uint8_t)toupper((int)byte);
+        }
+
         packet[frame_len++] = (char)byte;
 
         if (byte == '>') {
@@ -131,14 +138,16 @@ static bool consume_latest_rx_packet(char *packet, uint16_t packet_size){
  */
 static void parse_rx_packet(char *packet){
     switch(packet[1]){
-        case 'H':
+        case 'H':{
             serial_to_elbow_msg_t msg = {
                 .command = CMD_HOME,
                 .value = 0
             };
             osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
             break;
-        case 'M':
+
+        }
+        case 'M':{
             float value = 0;
             if (sscanf(packet, "<M,%f>", &value) == 1) {
                 serial_to_elbow_msg_t msg = {
@@ -148,6 +157,18 @@ static void parse_rx_packet(char *packet){
                 osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
             }
             break;
+
+        }
+        case 'P':{
+            int value = 0;
+            if (sscanf(packet, "<P,%d>", &value) == 1) {
+                serial_to_precharge_msg_t msg = {
+                    .command = (value == 0) ? CMD_OFF : CMD_ON
+                };
+                osMessageQueuePut(serial_to_prechargeHandle, &msg, 0, 0);
+            }
+            break;
+        }
     }
 }
 
@@ -197,25 +218,28 @@ static serial_state_t init_serial_service(){
     tx_data.switch2_status = (HAL_GPIO_ReadPin(LIMIT_SW_2_GPIO_Port, LIMIT_SW_2_Pin) == limitswitch2_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
     tx_data.switch3_status = (HAL_GPIO_ReadPin(LIMIT_SW_3_GPIO_Port, LIMIT_SW_3_Pin) == limitswitch3_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
     tx_data.elbow_status = STATUS_NEEDS_HOME;
+    tx_data.precharge_status = STATUS_OFF;
     last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
     return SERIAL_IDLE;
 }
 
 /**
- * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow>.
+ * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow,precharge>.
  */
 static void update_tx_buffer(void){
     limitswitch_event_t switch2_status = tx_data.switch2_status;
     limitswitch_event_t switch3_status = tx_data.switch3_status;
     elbow_to_serial_status_t elbow_status = tx_data.elbow_status;
+    precharge_to_serial_status_t precharge_status = tx_data.precharge_status;
 
     char local_buffer[APP_TX_DATA_SIZE];
     int written = snprintf(local_buffer,
                            sizeof(local_buffer),
-                           "<%u,%u,%u>",
+                           "<%u,%u,%u,%u>",
                            (unsigned int)switch2_status,
                            (unsigned int)switch3_status,
-                           (unsigned int)elbow_status);
+                           (unsigned int)elbow_status,
+                           (unsigned int)precharge_status);
 
     if (written <= 0) {
         tx_buffer.size = 0;
@@ -247,6 +271,11 @@ static serial_state_t handle_idle(void){
 
     if (osMessageQueueGetCount(elbow_to_serialHandle) > 0) {
         osMessageQueueGet(elbow_to_serialHandle, &tx_data.elbow_status, NULL, 0);
+        return SERIAL_TX;
+    }
+
+    if (osMessageQueueGetCount(precharge_to_serialHandle) > 0) {
+        osMessageQueueGet(precharge_to_serialHandle, &tx_data.precharge_status, NULL, 0);
         return SERIAL_TX;
     }
 

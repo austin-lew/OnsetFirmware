@@ -50,6 +50,32 @@ typedef struct{
 
 extern osMessageQueueId_t elbow_to_serialHandle;
 
+/* Serial to Precharge Message Passing       -------------------------------------*/
+
+typedef enum{
+    CMD_OFF=0,
+    CMD_ON=1
+} serial_to_precharge_cmd_t;
+
+typedef struct{
+    serial_to_precharge_cmd_t command;
+} serial_to_precharge_msg_t;
+
+extern osMessageQueueId_t serial_to_prechargeHandle;
+
+/* Precharge to Serial Message Passing       -------------------------------------*/
+
+typedef enum{
+    STATUS_OFF=0,
+    STATUS_PRECHARGE_ON=1,
+    STATUS_MAIN_POWER_ON=2
+} precharge_to_serial_status_t;
+
+typedef struct{
+    precharge_to_serial_status_t status;
+} precharge_to_serial_msg_t;
+
+extern osMessageQueueId_t precharge_to_serialHandle;
 
 #ifdef __cplusplus
 }

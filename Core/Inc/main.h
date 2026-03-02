@@ -71,8 +71,8 @@ void Error_Handler(void);
 #define LIMIT_SW_4_EXTI_IRQn EXTI3_IRQn
 #define BATT_MAIN_EN_L_Pin GPIO_PIN_4
 #define BATT_MAIN_EN_L_GPIO_Port GPIOA
-#define PRECHARG_EN_Pin GPIO_PIN_5
-#define PRECHARG_EN_GPIO_Port GPIOA
+#define PRECHRG_EN_Pin GPIO_PIN_5
+#define PRECHRG_EN_GPIO_Port GPIOA
 #define ELBOW_STEP_Pin GPIO_PIN_6
 #define ELBOW_STEP_GPIO_Port GPIOA
 #define ELBOW_DIR_Pin GPIO_PIN_7

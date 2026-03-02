@@ -50,6 +50,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ./Services/Src/heartbeat_service.c
     ./Services/Src/elbow_service.c
     ./Services/Src/serial_service.c
+    ./Services/Src/precharge_service.c
 )
 
 # Add include paths
