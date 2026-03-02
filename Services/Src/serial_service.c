@@ -232,6 +232,66 @@ static void update_tx_buffer(void){
 }
 
 /**
+ * @brief Handles SERIAL_IDLE state transitions.
+ *
+ * @return Next serial state.
+ */
+static serial_state_t handle_idle(void){
+    if (rx_buffer_has_data()) {
+        return SERIAL_RX;
+    }
+
+    if (limitswitch_change_counter != last_transmitted_limitswitch_change_counter) {
+        return SERIAL_TX;
+    }
+
+    if (osMessageQueueGetCount(elbow_to_serialHandle) > 0) {
+        osMessageQueueGet(elbow_to_serialHandle, &tx_data.elbow_status, NULL, 0);
+        return SERIAL_TX;
+    }
+
+    return SERIAL_IDLE;
+}
+
+/**
+ * @brief Handles SERIAL_RX state work and transitions.
+ *
+ * @return Next serial state.
+ */
+static serial_state_t handle_rx(void){
+    if (!consume_latest_rx_packet(latest_rx_packet, sizeof(latest_rx_packet))) {
+        return SERIAL_IDLE;
+    }
+
+    parse_rx_packet(latest_rx_packet);
+    return SERIAL_IDLE;
+}
+
+/**
+ * @brief Handles SERIAL_TX state work and transitions.
+ *
+ * @return Next serial state.
+ */
+static serial_state_t handle_tx(void){
+    if (usb_tx_busy()) {
+        return SERIAL_TX;
+    }
+
+    update_tx_buffer();
+
+    if (tx_buffer.size == 0U) {
+        return SERIAL_IDLE;
+    }
+
+    if (CDC_Transmit_FS((uint8_t *)(void *)tx_buffer.buffer, tx_buffer.size) != USBD_OK) {
+        return SERIAL_TX;
+    }
+
+    last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
+    return SERIAL_IDLE;
+}
+
+/**
  * @brief Executes one iteration of the serial service state machine.
  *
  * @param state Current state.
@@ -240,43 +300,11 @@ static void update_tx_buffer(void){
 static serial_state_t state_machine(serial_state_t state){
     switch(state){
         case SERIAL_IDLE:
-            if (rx_buffer_has_data()) {
-                return SERIAL_RX;
-            }
-
-            if (limitswitch_change_counter != last_transmitted_limitswitch_change_counter) {
-                return SERIAL_TX;
-            }
-
-            if (osMessageQueueGetCount(elbow_to_serialHandle) > 0) {
-                osMessageQueueGet(elbow_to_serialHandle, &tx_data.elbow_status, NULL, 0);
-                return SERIAL_TX;
-            }
-            return SERIAL_IDLE;
+            return handle_idle();
         case SERIAL_RX:
-            if(consume_latest_rx_packet(latest_rx_packet, sizeof(latest_rx_packet)) == false) {
-                return SERIAL_IDLE;
-            }
-            parse_rx_packet(latest_rx_packet);
-            return SERIAL_IDLE;
+            return handle_rx();
         case SERIAL_TX:
-            if (usb_tx_busy()) {
-                return SERIAL_TX;
-            }
-
-            update_tx_buffer();
-
-            if (tx_buffer.size == 0U) {
-                return SERIAL_IDLE;
-            }
-
-            if (CDC_Transmit_FS((uint8_t *)(void *)tx_buffer.buffer, tx_buffer.size) != USBD_OK) {
-                return SERIAL_TX;
-            }
-
-            last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
-            
-            return SERIAL_IDLE;
+            return handle_tx();
         default:
             return SERIAL_IDLE;
     }
