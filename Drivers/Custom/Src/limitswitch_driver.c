@@ -15,7 +15,7 @@ static limitswitch_config_t limitswitch_configs[NUM_SWITCHES] = {0};
 
 bool register_limitswitch(limitswitch_id_t limitswitch_id, limitswitch_config_t config)
 {
-    if (limitswitch_id >= NUM_SWITCHES)
+    if (limitswitch_id > NUM_SWITCHES)
     {
         return false;
     }
@@ -25,7 +25,7 @@ bool register_limitswitch(limitswitch_id_t limitswitch_id, limitswitch_config_t 
         return false;
     }
 
-    limitswitch_configs[limitswitch_id] = config;
+    limitswitch_configs[limitswitch_id-1] = config;
     return true;
 }
 

@@ -51,7 +51,7 @@ precharge_state_t handle_power_off_state()
     {
         if (msg.command == CMD_ON)
         {
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_status_t){STATUS_PRECHARGE_ON}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_ON}, 0, 0);
             return PRECHARGE_ON;
         }
     }
@@ -68,11 +68,11 @@ precharge_state_t handle_precharge_on_state()
         if (msg.command == CMD_OFF)
         {
             precharge_off();
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_status_t){STATUS_OFF}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_OFF}, 0, 0);
             return POWER_OFF;
         }
     }
-    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_status_t){STATUS_MAIN_POWER_ON}, 0, 0);
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_MAIN_POWER_ON}, 0, 0);
     return MAIN_POWER_ON;
 }
 
@@ -86,7 +86,7 @@ precharge_state_t handle_main_power_on_state()
         if (msg.command == CMD_OFF)
         {
             main_power_off();
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_status_t){STATUS_OFF}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_OFF}, 0, 0);
             return POWER_OFF;
         }
     }

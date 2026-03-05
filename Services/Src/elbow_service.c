@@ -6,6 +6,7 @@
 #include "main.h"
 #include "freertos_handles.h"
 #include <math.h>
+#include "tim.h"
 
 #define MICROSTEP (16)
 #define ELBOW_REDUCTION (12)
@@ -36,6 +37,7 @@ static void limitswitch1_event_callback(limitswitch_event_t event)
 
 static elbow_state_t init_elbow_service()
 {
+    stepper_init(&htim3, TIM_CHANNEL_1, 1000, 500, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
     limitswitch_config_t limitswitch1_config = {
         .gpio_port = LIMIT_SW_1_GPIO_Port,
         .gpio_pin = LIMIT_SW_1_Pin,

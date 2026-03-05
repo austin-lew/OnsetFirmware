@@ -161,7 +161,7 @@ static void parse_rx_packet(char *packet)
         serial_to_elbow_msg_t msg = {
             .command = CMD_HOME,
             .value = 0};
-        osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
+        osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         break;
     }
     case 'M':
@@ -172,7 +172,7 @@ static void parse_rx_packet(char *packet)
             serial_to_elbow_msg_t msg = {
                 .command = CMD_MOVE,
                 .value = value};
-            osMessageQueuePut(elbow_to_serialHandle, &msg, 0, 0);
+            osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         }
         break;
     }
@@ -295,13 +295,17 @@ static serial_state_t handle_idle(void)
 
     if (osMessageQueueGetCount(elbow_to_serialHandle) > 0)
     {
-        osMessageQueueGet(elbow_to_serialHandle, &tx_data.elbow_status, NULL, 0);
+        elbow_to_serial_msg_t msg;
+        osMessageQueueGet(elbow_to_serialHandle, &msg, NULL, 0);
+        tx_data.elbow_status = msg.status;
         return SERIAL_TX;
     }
 
     if (osMessageQueueGetCount(precharge_to_serialHandle) > 0)
     {
-        osMessageQueueGet(precharge_to_serialHandle, &tx_data.precharge_status, NULL, 0);
+        precharge_to_serial_msg_t msg;
+        osMessageQueueGet(precharge_to_serialHandle, &msg, NULL, 0);
+        tx_data.precharge_status = msg.status;
         return SERIAL_TX;
     }
 
