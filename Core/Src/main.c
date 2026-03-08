@@ -120,6 +120,7 @@ void Maybe_SendStatePacket(void);
 void Motion_ServiceCallback(void);
 bool Is_HomeFrame(const char* frame);
 bool Execute_Homing(void);
+bool WaitForSw1DebouncedState(uint8_t expected_state, uint32_t timeout_ms);
 bool Parse_MoveFrame(const char* frame, float* radians_out);
 int32_t RadiansToMicrosteps(float radians);
 float ClampTargetRadians(float radians);
@@ -511,7 +512,7 @@ bool Execute_Homing(void)
     Refresh_SwitchStates();
   }
 
-  if (sw1_state != 1U) {
+  if (!WaitForSw1DebouncedState(1U, LIMIT_SWITCH_DEBOUNCE_MS + 30U)) {
     return false;
   }
 
@@ -519,19 +520,38 @@ bool Execute_Homing(void)
   Stepper_SetSpeed(&stepper_motor, homing_max_speed);
 
   uint32_t backoff_steps = 0;
-  while (ReadSwitchPressed(SW1_GPIO_Port, SW1_Pin) == 1U && backoff_steps < homing_travel_limit_steps) {
+  Refresh_SwitchStates();
+  while (sw1_state == 1U && backoff_steps < homing_travel_limit_steps) {
     Stepper_MoveSteps(&stepper_motor, 1);
     backoff_steps++;
+    Refresh_SwitchStates();
   }
 
-  Refresh_SwitchStates();
-  if (ReadSwitchPressed(SW1_GPIO_Port, SW1_Pin) == 1U) {
+  if (!WaitForSw1DebouncedState(0U, LIMIT_SWITCH_DEBOUNCE_MS + 30U)) {
     return false;
   }
 
   stepper_motor.current_position_microsteps = 0;
   is_homed = true;
   return true;
+}
+
+/**
+ * @brief Wait for SW1 debounced state to match expected value
+ */
+bool WaitForSw1DebouncedState(uint8_t expected_state, uint32_t timeout_ms)
+{
+  uint32_t start = HAL_GetTick();
+  while ((HAL_GetTick() - start) < timeout_ms) {
+    Refresh_SwitchStates();
+    if (sw1_state == expected_state) {
+      return true;
+    }
+    HAL_Delay(1);
+  }
+
+  Refresh_SwitchStates();
+  return (sw1_state == expected_state);
 }
 
 /**
