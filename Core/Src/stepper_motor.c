@@ -58,6 +58,7 @@ void Stepper_Init(StepperMotor_t* motor)
   /* Initialize motor structure */
   motor->step_count = 0;
   motor->is_moving = false;
+  motor->stop_requested = false;
   motor->direction = STEPPER_DIR_CLOCKWISE;
   motor->steps_per_second = 1000;  /* Default 1000 steps/sec */
   motor->current_position_microsteps = 0;
@@ -145,6 +146,7 @@ void Stepper_MoveSteps(StepperMotor_t* motor, uint32_t steps)
   }
 
   motor->is_moving = true;
+  motor->stop_requested = false;
 
   /* Calculate delay in microseconds between steps */
   uint32_t step_delay_us = 1000000 / motor->steps_per_second;
@@ -174,6 +176,7 @@ void Stepper_MoveSteps(StepperMotor_t* motor, uint32_t steps)
   }
 
   motor->is_moving = false;
+  motor->stop_requested = false;
 }
 
 /**
@@ -202,10 +205,14 @@ bool Stepper_MoveToPositionMicrosteps(StepperMotor_t* motor,
   Stepper_SetDirection(motor, (delta >= 0) ? STEPPER_DIR_CLOCKWISE : STEPPER_DIR_COUNTERCLOCKWISE);
 
   motor->is_moving = true;
+  motor->stop_requested = false;
 
   float current_speed = 200.0f;
   float max_speed = (float)max_steps_per_second;
   float accel = (float)accel_steps_per_second2;
+  const float min_profile_speed = 200.0f;
+  const float smooth_stop_end_speed = 20.0f;
+  bool reached_target = true;
 
   if (current_speed > max_speed) {
     current_speed = max_speed;
@@ -213,6 +220,7 @@ bool Stepper_MoveToPositionMicrosteps(StepperMotor_t* motor,
 
   for (uint32_t i = 0; i < total_steps; i++) {
     if (!motor->is_moving) {
+      reached_target = false;
       break;
     }
 
@@ -220,15 +228,27 @@ bool Stepper_MoveToPositionMicrosteps(StepperMotor_t* motor,
     float steps_to_stop = (current_speed * current_speed) / (2.0f * accel);
     float dt = 1.0f / current_speed;
 
-    if (steps_to_stop >= (float)steps_remaining) {
+    if (motor->stop_requested) {
       current_speed -= accel * dt;
-      if (current_speed < 200.0f) {
-        current_speed = 200.0f;
+      if (current_speed <= smooth_stop_end_speed) {
+        reached_target = false;
+        motor->is_moving = false;
+        break;
+      }
+      if (current_speed < smooth_stop_end_speed) {
+        current_speed = smooth_stop_end_speed;
       }
     } else {
-      current_speed += accel * dt;
-      if (current_speed > max_speed) {
-        current_speed = max_speed;
+      if (steps_to_stop >= (float)steps_remaining) {
+        current_speed -= accel * dt;
+        if (current_speed < min_profile_speed) {
+          current_speed = min_profile_speed;
+        }
+      } else {
+        current_speed += accel * dt;
+        if (current_speed > max_speed) {
+          current_speed = max_speed;
+        }
       }
     }
 
@@ -246,7 +266,8 @@ bool Stepper_MoveToPositionMicrosteps(StepperMotor_t* motor,
   }
 
   motor->is_moving = false;
-  return true;
+  motor->stop_requested = false;
+  return reached_target;
 }
 
 /**
@@ -260,6 +281,20 @@ void Stepper_SetServiceCallback(Stepper_ServiceCallback_t callback)
 }
 
 /**
+  * @brief Request smooth deceleration stop for profile-based motion
+  * @param motor Pointer to stepper motor structure
+  * @retval None
+  */
+void Stepper_RequestSmoothStop(StepperMotor_t* motor)
+{
+  if (motor == NULL) {
+    return;
+  }
+
+  motor->stop_requested = true;
+}
+
+/**
   * @brief Stop motor movement
   * @param motor Pointer to stepper motor structure
   * @retval None
@@ -270,6 +305,7 @@ void Stepper_Stop(StepperMotor_t* motor)
     return;
   }
 
+  motor->stop_requested = false;
   motor->is_moving = false;
 }
 

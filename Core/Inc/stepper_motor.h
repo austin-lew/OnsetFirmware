@@ -54,6 +54,7 @@ typedef struct {
   
   volatile uint32_t step_count;    /*!< Total steps executed */
   volatile bool is_moving;         /*!< Motor movement flag */
+  volatile bool stop_requested;    /*!< Smooth stop request flag */
   StepperDirection_t direction;    /*!< Current direction */
   uint32_t steps_per_second;       /*!< Motor speed in steps/sec */
   volatile int32_t current_position_microsteps; /*!< Signed elbow position in microsteps */
@@ -122,6 +123,13 @@ bool Stepper_MoveToPositionMicrosteps(StepperMotor_t* motor,
  * @retval None
  */
 void Stepper_SetServiceCallback(Stepper_ServiceCallback_t callback);
+
+/**
+ * @brief Request smooth deceleration stop for profile-based motion
+ * @param motor Pointer to stepper motor structure
+ * @retval None
+ */
+void Stepper_RequestSmoothStop(StepperMotor_t* motor);
 
 /**
  * @brief Stop motor movement

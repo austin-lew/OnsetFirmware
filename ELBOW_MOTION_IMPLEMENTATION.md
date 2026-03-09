@@ -107,6 +107,7 @@ Current requirement behavior:
 
 - SW1 events can stop homing approach when pressed
 - SW2/SW3 remain report-only in state packet
+- homing seek/backoff profile runs at `1/10` of regular move max speed and acceleration
 
 ## Command Handling Notes
 

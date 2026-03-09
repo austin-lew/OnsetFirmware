@@ -70,6 +70,12 @@ typedef enum {
   ELBOW_STATUS_MOVE_ERROR = 6
 } ElbowStatus_t;
 
+typedef enum {
+  HOMING_PHASE_NONE = 0,
+  HOMING_PHASE_SEEK_PRESS,
+  HOMING_PHASE_BACKOFF_RELEASE
+} HomingPhase_t;
+
 typedef struct {
   uint8_t sw2;
   uint8_t sw3;
@@ -83,6 +89,8 @@ static volatile uint8_t sw3_state = 0;
 static volatile uint8_t elbow_status = ELBOW_STATUS_NEEDS_HOME;
 static volatile bool is_homed = false;
 static volatile bool homing_in_progress = false;
+static volatile HomingPhase_t homing_phase = HOMING_PHASE_NONE;
+static volatile bool sw1_trip_requires_home = false;
 static const uint8_t precharge_status = 1;
 static StatePacket_t last_sent_packet = {255U, 255U, 255U, 255U};
 
@@ -95,7 +103,7 @@ static StatePacket_t last_sent_packet = {255U, 255U, 255U, 255U};
 
 #define PROFILE_MAX_STEPS_PER_SEC 9600U
 #define PROFILE_ACCEL_STEPS_PER_SEC2 24000U
-#define HOMING_SPEED_DIVISOR 5U
+#define HOMING_SPEED_DIVISOR 10U
 #define LIMIT_SWITCH_DEBOUNCE_MS 20U
 
 static volatile uint8_t sw1_candidate_state = 0;
@@ -476,8 +484,13 @@ void Motion_ServiceCallback(void)
 {
   Refresh_SwitchStates();
 
-  if (homing_in_progress && sw1_state == 1U) {
-    Stepper_Stop(&stepper_motor);
+  if (homing_in_progress) {
+    if (homing_phase == HOMING_PHASE_SEEK_PRESS && sw1_state == 1U) {
+      Stepper_RequestSmoothStop(&stepper_motor);
+    }
+    if (homing_phase == HOMING_PHASE_BACKOFF_RELEASE && sw1_state == 0U) {
+      Stepper_RequestSmoothStop(&stepper_motor);
+    }
   }
 
   Maybe_SendStatePacket();
@@ -503,11 +516,13 @@ bool Execute_Homing(void)
 
   if (sw1_state != 1U) {
     homing_in_progress = true;
+    homing_phase = HOMING_PHASE_SEEK_PRESS;
     int32_t home_seek_target = stepper_motor.current_position_microsteps - (int32_t)homing_travel_limit_steps;
     (void)Stepper_MoveToPositionMicrosteps(&stepper_motor,
                                            home_seek_target,
                                            homing_max_speed,
                                            homing_accel);
+    homing_phase = HOMING_PHASE_NONE;
     homing_in_progress = false;
     Refresh_SwitchStates();
   }
@@ -516,16 +531,15 @@ bool Execute_Homing(void)
     return false;
   }
 
-  Stepper_SetDirection(&stepper_motor, STEPPER_DIR_CLOCKWISE);
-  Stepper_SetSpeed(&stepper_motor, homing_max_speed);
-
-  uint32_t backoff_steps = 0;
-  Refresh_SwitchStates();
-  while (sw1_state == 1U && backoff_steps < homing_travel_limit_steps) {
-    Stepper_MoveSteps(&stepper_motor, 1);
-    backoff_steps++;
-    Refresh_SwitchStates();
-  }
+  homing_in_progress = true;
+  homing_phase = HOMING_PHASE_BACKOFF_RELEASE;
+  int32_t home_backoff_target = stepper_motor.current_position_microsteps + (int32_t)homing_travel_limit_steps;
+  (void)Stepper_MoveToPositionMicrosteps(&stepper_motor,
+                                         home_backoff_target,
+                                         homing_max_speed,
+                                         homing_accel);
+  homing_phase = HOMING_PHASE_NONE;
+  homing_in_progress = false;
 
   if (!WaitForSw1DebouncedState(0U, LIMIT_SWITCH_DEBOUNCE_MS + 30U)) {
     return false;
@@ -573,6 +587,7 @@ void Process_Command(const char* frame)
 
     if (Execute_Homing()) {
       elbow_status = ELBOW_STATUS_HOME_SUCCESS;
+      sw1_trip_requires_home = false;
     } else {
       is_homed = false;
       elbow_status = ELBOW_STATUS_HOME_ERROR;
@@ -595,6 +610,7 @@ void Process_Command(const char* frame)
   target_radians = ClampTargetRadians(target_radians);
 
   elbow_status = ELBOW_STATUS_MOVING;
+  sw1_trip_requires_home = false;
   Maybe_SendStatePacket();
 
   int32_t target_microsteps = RadiansToMicrosteps(target_radians);
@@ -602,6 +618,13 @@ void Process_Command(const char* frame)
                                                   target_microsteps,
                                                   PROFILE_MAX_STEPS_PER_SEC,
                                                   PROFILE_ACCEL_STEPS_PER_SEC2);
+
+  if (sw1_trip_requires_home) {
+    is_homed = false;
+    elbow_status = ELBOW_STATUS_NEEDS_HOME;
+    SendStatePacketNow();
+    return;
+  }
 
   elbow_status = move_ok ? ELBOW_STATUS_MOVE_SUCCESS : ELBOW_STATUS_MOVE_ERROR;
   Maybe_SendStatePacket();
@@ -615,8 +638,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     sw1_candidate_state = ReadSwitchPressed(SW1_GPIO_Port, SW1_Pin);
     sw1_last_change_tick = now;
 
-    if (homing_in_progress && sw1_candidate_state == 1U) {
+    if (homing_in_progress) {
+      if (homing_phase == HOMING_PHASE_SEEK_PRESS && sw1_candidate_state == 1U) {
+        Stepper_RequestSmoothStop(&stepper_motor);
+      }
+      if (homing_phase == HOMING_PHASE_BACKOFF_RELEASE && sw1_candidate_state == 0U) {
+        Stepper_RequestSmoothStop(&stepper_motor);
+      }
+    }
+
+    if (!homing_in_progress && stepper_motor.is_moving && sw1_candidate_state == 1U) {
       Stepper_Stop(&stepper_motor);
+      sw1_trip_requires_home = true;
+      is_homed = false;
+      elbow_status = ELBOW_STATUS_NEEDS_HOME;
     }
   }
 

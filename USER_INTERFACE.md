@@ -51,10 +51,10 @@ Behavior:
 ```
 
 Behavior:
-- Runs at `1/5` of regular move max speed and acceleration.
+- Runs at `1/10` of regular move max speed and acceleration.
 - Seeks in the negative-angle direction up to `pi/2` radians of travel.
-- Stops approach when `SW1` is pressed (`PC8` LOW).
-- Backs off in reverse until `SW1` releases (`PC8` HIGH).
+- On `SW1` press (`PC8` LOW), seek transitions into smooth deceleration stop.
+- Backs off in reverse and on `SW1` release (`PC8` HIGH), transitions into smooth deceleration stop.
 - On success, marks the axis homed so move commands are accepted.
 
 ## State Packet Protocol
@@ -110,3 +110,4 @@ Elbow moves use a trapezoidal profile with fixed firmware parameters:
 - `SW2`/`SW3` are currently report-only and do not block or stop normal motion.
 - During active motion, switch transitions are still reported via state packets.
 - TX packet format remains `<SW2,SW3,ELBOW_STATUS,PRECHARGE_STATUS>` (no dedicated `SW1` field).
+- If `SW1` is pressed during a regular move, firmware performs an immediate hard stop, clears homed state, and requires a new home (`ELBOW_STATUS=0`) before the next move.

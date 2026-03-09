@@ -137,9 +137,9 @@ For each accepted command:
 ## Homing behavior
 - `<H>` seeks toward the negative-angle direction.
 - Seek distance is limited to `π/2` radians of equivalent travel.
-- Homing approach runs at `1/5` of regular move profile (`max_steps_per_second`, `accel_steps_per_second2`).
-- On SW1 press (`PC8` LOW), approach stops.
-- Firmware then backs off in reverse until SW1 releases (`PC8` HIGH), marks homed, and sets `current_position_microsteps=0`.
+- Homing seek/backoff runs at `1/10` of regular move profile (`max_steps_per_second`, `accel_steps_per_second2`).
+- On SW1 press (`PC8` LOW), approach transitions to smooth deceleration stop.
+- Firmware then backs off in reverse, and on SW1 release (`PC8` HIGH) transitions to smooth deceleration stop, then marks homed and sets `current_position_microsteps=0`.
 
 The position accumulator is updated per step in `Stepper_Step`, so state remains consistent across commands.
 
@@ -253,7 +253,8 @@ Typical VS Code tasks available in this workspace:
 - Motion commands are single-threaded and blocking.
 - Move commands are gated until a successful homing command is completed.
 - New `<M,VALUE>` commands are ignored while moving.
-- SW1 is used for homing stop/back-off; SW2/SW3 remain report-only.
+- SW1 is used for homing stop/back-off and as a regular-move safety interlock.
+- If SW1 is pressed during a regular move, firmware hard-stops immediately and marks axis as needs-home (`ELBOW_STATUS=0`).
 - `PRECHARGE_STATUS` is fixed to `1`.
 
 ---
