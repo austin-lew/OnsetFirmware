@@ -152,17 +152,21 @@ static bool consume_latest_rx_packet(char *packet, uint16_t packet_size)
  *
  * @param packet Null-terminated frame in the form <...>.
  */
-static void parse_rx_packet(char *packet)
+static serial_state_t parse_rx_packet(char *packet)
 {
     switch (packet[1])
     {
+    case 'S':
+    {
+        return SERIAL_TX;
+    }
     case 'H':
     {
         serial_to_elbow_msg_t msg = {
             .command = CMD_HOME,
             .value = 0};
         osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
-        break;
+        return SERIAL_IDLE;
     }
     case 'M':
     {
@@ -174,7 +178,7 @@ static void parse_rx_packet(char *packet)
                 .value = value};
             osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         }
-        break;
+        return SERIAL_IDLE;
     }
     case 'P':
     {
@@ -185,7 +189,7 @@ static void parse_rx_packet(char *packet)
                 .command = (value == 0) ? CMD_OFF : CMD_ON};
             osMessageQueuePut(serial_to_prechargeHandle, &msg, 0, 0);
         }
-        break;
+        return SERIAL_IDLE;
     }
     }
 }
@@ -324,8 +328,7 @@ static serial_state_t handle_rx(void)
         return SERIAL_IDLE;
     }
 
-    parse_rx_packet(latest_rx_packet);
-    return SERIAL_IDLE;
+    return parse_rx_packet(latest_rx_packet);
 }
 
 /**
