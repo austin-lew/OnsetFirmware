@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     ./Drivers/Custom/Src/limitswitch_driver.c
     ./Drivers/Custom/Src/stepper_driver.c
+    ./Drivers/Custom/Src/encoder.c
     ./Services/Src/heartbeat_service.c
     ./Services/Src/elbow_service.c
     ./Services/Src/serial_service.c

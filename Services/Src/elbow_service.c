@@ -7,6 +7,7 @@
 #include "freertos_handles.h"
 #include <math.h>
 #include "tim.h"
+#include "encoder.h"
 
 #define MICROSTEP (16)
 #define ELBOW_REDUCTION (12)
@@ -127,7 +128,8 @@ static elbow_state_t handle_homing(void)
     {
         osDelay(10);
     }
-
+    
+    encoder_set_position(&ENC_1_TIM, 0);
     stepper_tare();
     stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
     send_serial_msg(STATUS_HOME_SUCCESS, 0);

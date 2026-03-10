@@ -43,7 +43,8 @@ extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim16;
 
 /* USER CODE BEGIN Private defines */
-
+#define ENC_1_TIM (htim1)
+#define ENC_2_TIM (htim4)
 /* USER CODE END Private defines */
 
 void MX_TIM1_Init(void);
