@@ -32,6 +32,7 @@
 #include "elbow_service.h"
 #include "serial_service.h"
 #include "precharge_service.h"
+#include "led_service.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -87,6 +88,13 @@ const osThreadAttr_t precharge_service_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
+/* Definitions for led_service */
+osThreadId_t led_serviceHandle;
+const osThreadAttr_t led_service_attributes = {
+  .name = "led_service",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 128 * 4
+};
 /* Definitions for serial_to_elbow */
 osMessageQueueId_t serial_to_elbowHandle;
 const osMessageQueueAttr_t serial_to_elbow_attributes = {
@@ -118,6 +126,7 @@ extern void start_elbow_service(void *argument);
 extern void start_heartbeat_service(void *argument);
 extern void start_serial_service(void *argument);
 extern void start_precharge_service(void *argument);
+extern void start_led_service(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -175,6 +184,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of precharge_service */
   precharge_serviceHandle = osThreadNew(start_precharge_service, NULL, &precharge_service_attributes);
+
+  /* creation of led_service */
+  led_serviceHandle = osThreadNew(start_led_service, NULL, &led_service_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
