@@ -11,6 +11,9 @@
 #define MICROSTEP (16)
 #define ELBOW_REDUCTION (12)
 #define STEPS_PER_REV (200 * MICROSTEP * ELBOW_REDUCTION)
+#define ELBOW_MAX_STEPS_PER_SECOND (1000U)
+#define ELBOW_MAX_STEPS_PER_SECOND2 (500U)
+#define ELBOW_HOMING_SPEED_DIVISOR (10U)
 
 // Enum for elbow motor states
 typedef enum
@@ -37,7 +40,7 @@ static void limitswitch1_event_callback(limitswitch_event_t event)
 
 static elbow_state_t init_elbow_service()
 {
-    stepper_init(&htim3, TIM_CHANNEL_1, 1000, 500, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
+    stepper_init(&htim3, TIM_CHANNEL_1, ELBOW_MAX_STEPS_PER_SECOND, ELBOW_MAX_STEPS_PER_SECOND2, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
     limitswitch_config_t limitswitch1_config = {
         .gpio_port = LIMIT_SW_1_GPIO_Port,
         .gpio_pin = LIMIT_SW_1_Pin,
@@ -45,6 +48,7 @@ static elbow_state_t init_elbow_service()
         .callback = limitswitch1_event_callback};
 
     register_limitswitch(LIMITSWITCH_1, limitswitch1_config);
+    switch1_state = LIMITSWITCH_RELEASED;
 
     return NEEDS_HOME;
 }
@@ -92,14 +96,40 @@ static elbow_state_t handle_needs_home(void)
 
 static elbow_state_t handle_homing(void)
 {
-    stepper_home();
+    uint32_t homing_speed = ELBOW_MAX_STEPS_PER_SECOND / ELBOW_HOMING_SPEED_DIVISOR;
+    if (homing_speed == 0U)
+    {
+        homing_speed = 1U;
+    }
+
+    stepper_set_max_steps_per_second(homing_speed);
+
+    stepper_continuous_move(DIR_CCW);
     while (switch1_state != LIMITSWITCH_PRESSED)
     {
         osDelay(10);
     }
-    stepper_emergency_stop();
-    osDelay(100);
+
+    stepper_smooth_stop();
+    while (stepper_is_moving())
+    {
+        osDelay(10);
+    }
+
+    stepper_continuous_move(DIR_CW);
+    while (switch1_state == LIMITSWITCH_PRESSED)
+    {
+        osDelay(10);
+    }
+
+    stepper_smooth_stop();
+    while (stepper_is_moving())
+    {
+        osDelay(10);
+    }
+
     stepper_tare();
+    stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
     send_serial_msg(STATUS_HOME_SUCCESS, 0);
     return IDLE;
 }

@@ -39,9 +39,17 @@ extern "C"
 
   void stepper_tare();
 
+  void stepper_set_max_steps_per_second(uint32_t max_steps_per_second);
+
+  void stepper_continuous_move(stepper_dir_t direction);
+
   bool stepper_absolute_move(uint16_t steps);
 
+  bool stepper_smooth_stop(void);
+
   bool stepper_emergency_stop(void);
+
+  bool stepper_is_moving(void);
 
 #ifdef __cplusplus
 }
