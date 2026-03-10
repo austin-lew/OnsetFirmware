@@ -45,11 +45,20 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ./Drivers/Custom/Src/limitswitch_driver.c
+    ./Drivers/Custom/Src/stepper_driver.c
+    ./Drivers/Custom/Src/encoder.c
+    ./Services/Src/heartbeat_service.c
+    ./Services/Src/elbow_service.c
+    ./Services/Src/serial_service.c
+    ./Services/Src/precharge_service.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ./Drivers/Custom/Inc
+    ./Services/Inc
 )
 
 # Add project symbols (macros)
