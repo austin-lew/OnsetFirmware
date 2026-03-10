@@ -14,8 +14,8 @@ static led_state_t state;
 
 static led_state_t init_led_service()
 {
-    led_enable();
-    return LED_IDLE;
+    led_disable();
+    return LED_OFF;
 }
 
 static led_state_t state_machine(led_state_t state)
