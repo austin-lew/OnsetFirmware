@@ -8,6 +8,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#define WELCOME_MSG "[Onset] Ready\r\n"
+
 typedef enum
 {
     SERIAL_IDLE,
@@ -245,6 +247,13 @@ static serial_state_t init_serial_service()
     tx_data.elbow_status = STATUS_NEEDS_HOME;
     tx_data.precharge_status = STATUS_OFF;
     last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
+
+    while (usb_tx_busy())
+    {
+        osDelay(10);
+    }
+    CDC_Transmit_FS((uint8_t *)WELCOME_MSG, sizeof(WELCOME_MSG) - 1U);
+
     return SERIAL_IDLE;
 }
 
@@ -391,6 +400,7 @@ void start_serial_service(void *argument)
 {
     (void)argument;
     state = init_serial_service();
+
     while (true)
     {
         state = state_machine(state);
