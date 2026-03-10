@@ -23,10 +23,12 @@ static led_state_t state_machine(led_state_t state)
     switch (state)
     {
     case LED_OFF:
-        return LED_IDLE;
+        return LED_OFF;
     case LED_IDLE:
         return LED_IDLE;
     case LED_UPDATE:
+        return LED_IDLE;
+    default:
         return LED_IDLE;
     }
 }
@@ -37,6 +39,7 @@ void start_led_service(void *argument)
     state = init_led_service();
     while (true)
     {
+        state = state_machine(state);
         osDelay(50);
     }
 }
