@@ -36,9 +36,7 @@ static void main_power_off()
 
 static precharge_state_t init_precharge_service()
 {
-    precharge_off();
-    main_power_off();
-    return POWER_OFF;
+    return PRECHARGE_ON;
 }
 
 precharge_state_t handle_power_off_state()
