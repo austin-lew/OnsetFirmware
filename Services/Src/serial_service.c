@@ -191,6 +191,8 @@ static serial_state_t parse_rx_packet(char *packet)
         }
         return SERIAL_IDLE;
     }
+    default:
+        return SERIAL_IDLE;
     }
 }
 
