@@ -399,6 +399,7 @@ static serial_state_t state_machine(serial_state_t state)
 void start_serial_service(void *argument)
 {
     (void)argument;
+    while (true){}
     state = init_serial_service();
 
     while (true)

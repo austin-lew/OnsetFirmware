@@ -208,7 +208,7 @@ void MX_FREERTOS_Init(void) {
 void start_default_task(void *argument)
 {
   /* init code for USB_Device */
-  MX_USB_Device_Init();
+  // MX_USB_Device_Init();
   /* USER CODE BEGIN start_default_task */
   /* Infinite loop */
   for(;;)
