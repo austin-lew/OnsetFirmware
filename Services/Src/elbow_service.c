@@ -41,6 +41,8 @@ static void limitswitch1_event_callback(limitswitch_event_t event)
 
 static elbow_state_t init_elbow_service()
 {
+    encoder_init(&ENC_1_TIM);
+
     stepper_init(&htim3, TIM_CHANNEL_1, ELBOW_MAX_STEPS_PER_SECOND, ELBOW_MAX_STEPS_PER_SECOND2, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
     limitswitch_config_t limitswitch1_config = {
         .gpio_port = LIMIT_SW_1_GPIO_Port,
@@ -85,13 +87,13 @@ static elbow_state_t handle_needs_home(void)
 {
     serial_to_elbow_msg_t msg = get_serial_msg();
 
-    if (msg.command == CMD_HOME)
+    if (msg.command == CMD_ELBOW_HOME)
     {
-        send_serial_msg(STATUS_HOMING, 0);
+        send_serial_msg(STATUS_ELBOW_HOMING, 0);
         return HOMING;
     }
 
-    send_serial_msg(STATUS_NEEDS_HOME, 0);
+    send_serial_msg(STATUS_ELBOW_NEEDS_HOME, 0);
     return NEEDS_HOME;
 }
 
@@ -132,7 +134,7 @@ static elbow_state_t handle_homing(void)
     encoder_set_position(&ENC_1_TIM, 0);
     stepper_tare();
     stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
-    send_serial_msg(STATUS_HOME_SUCCESS, 0);
+    send_serial_msg(STATUS_ELBOW_HOME_SUCCESS, 0);
     return IDLE;
 }
 
@@ -140,22 +142,22 @@ static elbow_state_t handle_idle(elbow_service_ctx_t *ctx)
 {
     serial_to_elbow_msg_t msg = get_serial_msg();
 
-    if (msg.command == CMD_MOVE)
+    if (msg.command == CMD_ELBOW_MOVE)
     {
         if (msg.value < 0)
         {
-            send_serial_msg(STATUS_MOVE_ERROR, msg.value);
+            send_serial_msg(STATUS_ELBOW_MOVE_ERROR, msg.value);
             return IDLE;
         }
 
         ctx->move_target_steps = rads_to_steps(msg.value);
-        send_serial_msg(STATUS_MOVING, msg.value);
+        send_serial_msg(STATUS_ELBOW_MOVING, msg.value);
         return MOVING;
     }
 
-    if (msg.command == CMD_HOME)
+    if (msg.command == CMD_ELBOW_HOME)
     {
-        send_serial_msg(STATUS_HOMING, 0);
+        send_serial_msg(STATUS_ELBOW_HOMING, 0);
         return HOMING;
     }
 
@@ -168,11 +170,11 @@ static elbow_state_t handle_moving(const elbow_service_ctx_t *ctx)
 
     if (!move_started)
     {
-        send_serial_msg(STATUS_MOVE_ERROR, steps_to_rads(ctx->move_target_steps));
+        send_serial_msg(STATUS_ELBOW_MOVE_ERROR, steps_to_rads(ctx->move_target_steps));
         return IDLE;
     }
 
-    send_serial_msg(STATUS_MOVE_SUCCESS, steps_to_rads(ctx->move_target_steps));
+    send_serial_msg(STATUS_ELBOW_MOVE_SUCCESS, steps_to_rads(ctx->move_target_steps));
     return IDLE;
 }
 

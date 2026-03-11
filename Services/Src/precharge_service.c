@@ -37,12 +37,6 @@ static void main_power_off()
     HAL_GPIO_WritePin(BATT_MAIN_EN_L_GPIO_Port, BATT_MAIN_EN_L_Pin, GPIO_PIN_SET);
 }
 
-static void apply_forced_power_state_main_on_precharge_off()
-{
-    precharge_off();
-    main_power_on();
-}
-
 static void drain_ignored_precharge_commands()
 {
     serial_to_precharge_msg_t msg;
@@ -52,9 +46,23 @@ static void drain_ignored_precharge_commands()
     }
 }
 
+static void send_led_command(precharge_to_led_cmd_t command)
+{
+    precharge_to_led_msg_t msg = {
+        .command = command};
+    osMessageQueuePut(precharge_to_ledHandle, &msg, 0, 0);
+}
+
 static precharge_state_t init_precharge_service()
 {
-    return PRECHARGE_ON;
+    #if PRECHARGE_TEMP_BYPASS_MODE
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_MAIN_POWER_ON}, 0, 0);
+    send_led_command(CMD_LED_ON);
+    return MAIN_POWER_ON;
+    #else
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_OFF}, 0, 0);
+    return POWER_OFF;
+    #endif
 }
 
 precharge_state_t handle_power_off_state()
@@ -65,14 +73,15 @@ precharge_state_t handle_power_off_state()
     serial_to_precharge_msg_t msg;
     if (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, 0) == osOK)
     {
-        if (msg.command == CMD_ON)
+        if (msg.command == CMD_PRECHARGE_ON)
         {
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_ON}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_PRECHARGE_ON}, 0, 0);
             return PRECHARGE_ON;
         }
     }
     return POWER_OFF;
 }
+
 
 precharge_state_t handle_precharge_on_state()
 {
@@ -81,32 +90,41 @@ precharge_state_t handle_precharge_on_state()
     serial_to_precharge_msg_t msg;
     if (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, PRECHARGE_DURATION_MS) == osOK)
     {
-        if (msg.command == CMD_OFF)
+        if (msg.command == CMD_PRECHARGE_OFF)
         {
             precharge_off();
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_OFF}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_OFF}, 0, 0);
             return POWER_OFF;
         }
     }
-    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_MAIN_POWER_ON}, 0, 0);
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_MAIN_POWER_ON}, 0, 0);
+    send_led_command(CMD_LED_ON);
     return MAIN_POWER_ON;
 }
 
 precharge_state_t handle_main_power_on_state()
 {
+    #if PRECHARGE_TEMP_BYPASS_MODE
+    drain_ignored_precharge_commands();
+    precharge_off();
+    main_power_off();
+    return MAIN_POWER_ON;
+    #else
     precharge_on();
     main_power_on();
     serial_to_precharge_msg_t msg;
     if (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, 0) == osOK)
     {
-        if (msg.command == CMD_OFF)
+        if (msg.command == CMD_PRECHARGE_OFF)
         {
             main_power_off();
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_OFF}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_OFF}, 0, 0);
+            send_led_command(CMD_LED_OFF);
             return POWER_OFF;
         }
     }
     return MAIN_POWER_ON;
+    #endif
 }
 
 static precharge_state_t state_machine(precharge_state_t state)
@@ -130,22 +148,10 @@ static precharge_state_t state_machine(precharge_state_t state)
 void start_precharge_service(void *argument)
 {
     (void)argument;
-#if PRECHARGE_TEMP_BYPASS_MODE
-    // Hold this known-safe temporary state continuously and ignore serial commands.
-    apply_forced_power_state_main_on_precharge_off();
-    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_MAIN_POWER_ON}, 0, 0);
-    while (true)
-    {
-        apply_forced_power_state_main_on_precharge_off();
-        drain_ignored_precharge_commands();
-        osDelay(100);
-    }
-#else
     state = init_precharge_service();
     while (true)
     {
         state = state_machine(state);
         osDelay(100);
     }
-#endif
 }

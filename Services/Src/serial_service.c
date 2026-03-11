@@ -165,7 +165,7 @@ static serial_state_t parse_rx_packet(char *packet)
     case 'H':
     {
         serial_to_elbow_msg_t msg = {
-            .command = CMD_HOME,
+            .command = CMD_ELBOW_HOME,
             .value = 0};
         osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         return SERIAL_IDLE;
@@ -176,7 +176,7 @@ static serial_state_t parse_rx_packet(char *packet)
         if (sscanf(packet, "<M,%f>", &value) == 1)
         {
             serial_to_elbow_msg_t msg = {
-                .command = CMD_MOVE,
+                .command = CMD_ELBOW_MOVE,
                 .value = value};
             osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         }
@@ -188,7 +188,7 @@ static serial_state_t parse_rx_packet(char *packet)
         if (sscanf(packet, "<P,%d>", &value) == 1)
         {
             serial_to_precharge_msg_t msg = {
-                .command = (value == 0) ? CMD_OFF : CMD_ON};
+                .command = (value == 0) ? CMD_PRECHARGE_OFF : CMD_PRECHARGE_ON};
             osMessageQueuePut(serial_to_prechargeHandle, &msg, 0, 0);
         }
         return SERIAL_IDLE;
@@ -244,8 +244,8 @@ static serial_state_t init_serial_service()
 
     tx_data.switch2_status = (HAL_GPIO_ReadPin(LIMIT_SW_2_GPIO_Port, LIMIT_SW_2_Pin) == limitswitch2_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
     tx_data.switch3_status = (HAL_GPIO_ReadPin(LIMIT_SW_3_GPIO_Port, LIMIT_SW_3_Pin) == limitswitch3_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
-    tx_data.elbow_status = STATUS_NEEDS_HOME;
-    tx_data.precharge_status = STATUS_OFF;
+    tx_data.elbow_status = STATUS_ELBOW_NEEDS_HOME;
+    tx_data.precharge_status = STATUS_PRECHARGE_OFF;
     last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
 
     while (usb_tx_busy())
@@ -399,7 +399,6 @@ static serial_state_t state_machine(serial_state_t state)
 void start_serial_service(void *argument)
 {
     (void)argument;
-    while (true){}
     state = init_serial_service();
 
     while (true)

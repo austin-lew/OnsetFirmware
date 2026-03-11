@@ -115,6 +115,11 @@ osMessageQueueId_t precharge_to_serialHandle;
 const osMessageQueueAttr_t precharge_to_serial_attributes = {
   .name = "precharge_to_serial"
 };
+/* Definitions for precharge_to_led */
+osMessageQueueId_t precharge_to_ledHandle;
+const osMessageQueueAttr_t precharge_to_led_attributes = {
+  .name = "precharge_to_led"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -165,6 +170,9 @@ void MX_FREERTOS_Init(void) {
   /* creation of precharge_to_serial */
   precharge_to_serialHandle = osMessageQueueNew (16, sizeof(precharge_to_serial_msg_t), &precharge_to_serial_attributes);
 
+  /* creation of precharge_to_led */
+  precharge_to_ledHandle = osMessageQueueNew (16, sizeof(precharge_to_led_msg_t), &precharge_to_led_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -208,7 +216,7 @@ void MX_FREERTOS_Init(void) {
 void start_default_task(void *argument)
 {
   /* init code for USB_Device */
-  // MX_USB_Device_Init();
+  MX_USB_Device_Init();
   /* USER CODE BEGIN start_default_task */
   /* Infinite loop */
   for(;;)

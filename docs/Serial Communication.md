@@ -16,19 +16,19 @@ This is an ASCII based protocol. Each packet starts with a `<` and ends with a `
 ### Supported commands
 - `<H>`
 	- Meaning: Home command
-	- Action: Sends `CMD_HOME` to the elbow service queue
+	- Action: Sends `CMD_ELBOW_HOME` to the elbow service queue
 
 - `<M,VALUE>`
 	- Meaning: Move command
 	- `VALUE` is parsed as a float using `sscanf("<M,%f>", ...)`
-	- Action: Sends `CMD_MOVE` with parsed value to the elbow service queue
+	- Action: Sends `CMD_ELBOW_MOVE` with parsed value to the elbow service queue
 
 - `<P,VALUE>`
 	- Meaning: Precharge power command
 	- `VALUE` is parsed as an integer using `sscanf("<P,%d>", ...)`
 	- Action:
-		- `VALUE == 0` sends `CMD_OFF` to the precharge service queue
-		- `VALUE != 0` sends `CMD_ON` to the precharge service queue
+		- `VALUE == 0` sends `CMD_PRECHARGE_OFF` to the precharge service queue
+		- `VALUE != 0` sends `CMD_PRECHARGE_ON` to the precharge service queue
 
 ### RX parser behavior
 - Incoming bytes are read from the USB RX ring buffer.
@@ -59,18 +59,18 @@ This is an ASCII based protocol. Each packet starts with a `<` and ends with a `
     - `1` = `LIMITSWITCH_PRESSED`
 
 - `ELBOW_STATUS`: `elbow_to_serial_status_t`
-	- `0` = `STATUS_NEEDS_HOME`
-	- `1` = `STATUS_HOMING`
-	- `2` = `STATUS_HOME_ERROR`
-	- `3` = `STATUS_HOME_SUCCESS`
-	- `4` = `STATUS_MOVING`
-	- `5` = `STATUS_MOVE_SUCCESS`
-	- `6` = `STATUS_MOVE_ERROR`
+	- `0` = `STATUS_ELBOW_NEEDS_HOME`
+	- `1` = `STATUS_ELBOW_HOMING`
+	- `2` = `STATUS_ELBOW_HOME_ERROR`
+	- `3` = `STATUS_ELBOW_HOME_SUCCESS`
+	- `4` = `STATUS_ELBOW_MOVING`
+	- `5` = `STATUS_ELBOW_MOVE_SUCCESS`
+	- `6` = `STATUS_ELBOW_MOVE_ERROR`
 
 - `PRECHARGE_STATUS`: `precharge_to_serial_status_t`
-	- `0` = `STATUS_OFF`
-	- `1` = `STATUS_PRECHARGE_ON`
-	- `2` = `STATUS_MAIN_POWER_ON`
+	- `0` = `STATUS_PRECHARGE_OFF`
+	- `1` = `STATUS_PRECHARGE_PRECHARGE_ON`
+	- `2` = `STATUS_PRECHARGE_MAIN_POWER_ON`
 
 ### TX behavior
 - TX is non-blocking and checks CDC busy state before starting a new transfer.

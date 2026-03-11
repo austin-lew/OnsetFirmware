@@ -20,9 +20,9 @@ extern "C"
     /* Serial to Elbow Message Passing       -------------------------------------*/
     typedef enum
     {
-        CMD_HOME = 0,
-        CMD_MOVE = 1,
-        CMD_STOP = 2
+        CMD_ELBOW_HOME = 0,
+        CMD_ELBOW_MOVE = 1,
+        CMD_ELBOW_STOP = 2
     } serial_to_elbow_cmd_t;
 
     typedef struct
@@ -37,13 +37,13 @@ extern "C"
 
     typedef enum
     {
-        STATUS_NEEDS_HOME = 0,
-        STATUS_HOMING = 1,
-        STATUS_HOME_ERROR = 2,
-        STATUS_HOME_SUCCESS = 3,
-        STATUS_MOVING = 4,
-        STATUS_MOVE_SUCCESS = 5,
-        STATUS_MOVE_ERROR = 6,
+        STATUS_ELBOW_NEEDS_HOME = 0,
+        STATUS_ELBOW_HOMING = 1,
+        STATUS_ELBOW_HOME_ERROR = 2,
+        STATUS_ELBOW_HOME_SUCCESS = 3,
+        STATUS_ELBOW_MOVING = 4,
+        STATUS_ELBOW_MOVE_SUCCESS = 5,
+        STATUS_ELBOW_MOVE_ERROR = 6,
     } elbow_to_serial_status_t;
 
     typedef struct
@@ -58,8 +58,8 @@ extern "C"
 
     typedef enum
     {
-        CMD_OFF = 0,
-        CMD_ON = 1
+        CMD_PRECHARGE_OFF = 0,
+        CMD_PRECHARGE_ON = 1
     } serial_to_precharge_cmd_t;
 
     typedef struct
@@ -73,9 +73,9 @@ extern "C"
 
     typedef enum
     {
-        STATUS_OFF = 0,
-        STATUS_PRECHARGE_ON = 1,
-        STATUS_MAIN_POWER_ON = 2
+        STATUS_PRECHARGE_OFF = 0,
+        STATUS_PRECHARGE_PRECHARGE_ON = 1,
+        STATUS_PRECHARGE_MAIN_POWER_ON = 2
     } precharge_to_serial_status_t;
 
     typedef struct
@@ -84,6 +84,21 @@ extern "C"
     } precharge_to_serial_msg_t;
 
     extern osMessageQueueId_t precharge_to_serialHandle;
+
+    /* Precharge to LED Message Passing       -------------------------------------*/
+
+    typedef enum
+    {
+        CMD_LED_OFF = 0,
+        CMD_LED_ON = 1
+    } precharge_to_led_cmd_t;
+
+    typedef struct
+    {
+        precharge_to_led_cmd_t command;
+    } precharge_to_led_msg_t;
+
+    extern osMessageQueueId_t precharge_to_ledHandle;
 
 #ifdef __cplusplus
 }
