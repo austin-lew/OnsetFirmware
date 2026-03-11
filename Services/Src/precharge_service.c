@@ -4,6 +4,9 @@
 #include "main.h"
 
 #define PRECHARGE_DURATION_MS (1000) // Duration to wait in PRECHARGE_ON state before allowing MAIN_POWER_ON
+// Temporary bypass mode for load-related reset investigation.
+// Set to 0 to restore the normal precharge state machine behavior.
+#define PRECHARGE_TEMP_BYPASS_MODE (1)
 
 typedef enum
 {
@@ -32,6 +35,21 @@ static void main_power_on()
 static void main_power_off()
 {
     HAL_GPIO_WritePin(BATT_MAIN_EN_L_GPIO_Port, BATT_MAIN_EN_L_Pin, GPIO_PIN_SET);
+}
+
+static void apply_forced_power_state_main_on_precharge_off()
+{
+    precharge_off();
+    main_power_on();
+}
+
+static void drain_ignored_precharge_commands()
+{
+    serial_to_precharge_msg_t msg;
+    while (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, 0) == osOK)
+    {
+        (void)msg;
+    }
 }
 
 static precharge_state_t init_precharge_service()
@@ -112,10 +130,22 @@ static precharge_state_t state_machine(precharge_state_t state)
 void start_precharge_service(void *argument)
 {
     (void)argument;
+#if PRECHARGE_TEMP_BYPASS_MODE
+    // Hold this known-safe temporary state continuously and ignore serial commands.
+    apply_forced_power_state_main_on_precharge_off();
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_MAIN_POWER_ON}, 0, 0);
+    while (true)
+    {
+        apply_forced_power_state_main_on_precharge_off();
+        drain_ignored_precharge_commands();
+        osDelay(100);
+    }
+#else
     state = init_precharge_service();
     while (true)
     {
         state = state_machine(state);
         osDelay(100);
     }
+#endif
 }
