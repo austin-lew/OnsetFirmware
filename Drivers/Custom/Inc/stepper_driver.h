@@ -41,7 +41,7 @@ extern "C"
 
   void stepper_set_max_steps_per_second(uint32_t max_steps_per_second);
 
-  void stepper_continuous_move(stepper_dir_t direction);
+  bool stepper_relative_move(int32_t delta_steps);
 
   bool stepper_absolute_move(uint16_t steps);
 

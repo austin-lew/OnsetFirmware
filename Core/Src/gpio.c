@@ -58,14 +58,8 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, HEARTBEAT_LED_Pin|LED_EN_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : LIMIT_SW_1_Pin */
-  GPIO_InitStruct.Pin = LIMIT_SW_1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(LIMIT_SW_1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : LIMIT_SW_2_Pin LIMIT_SW_3_Pin LIMIT_SW_4_Pin */
-  GPIO_InitStruct.Pin = LIMIT_SW_2_Pin|LIMIT_SW_3_Pin|LIMIT_SW_4_Pin;
+  /*Configure GPIO pins : LIMIT_SW_1_Pin LIMIT_SW_2_Pin LIMIT_SW_3_Pin LIMIT_SW_4_Pin */
+  GPIO_InitStruct.Pin = LIMIT_SW_1_Pin|LIMIT_SW_2_Pin|LIMIT_SW_3_Pin|LIMIT_SW_4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);

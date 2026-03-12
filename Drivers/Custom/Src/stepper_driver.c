@@ -19,8 +19,8 @@ typedef struct
   uint32_t max_steps_per_second;
   uint32_t max_steps_per_second2;
   stepper_dir_t direction;
-  uint32_t step_count;
-  uint32_t step_count_setpoint;
+  int32_t step_count;
+  int32_t step_count_setpoint;
   uint16_t ccr_increment;
   bool stop_requested;
   bool is_moving;
@@ -54,7 +54,7 @@ void stepper_init(TIM_HandleTypeDef *timer,
 
 void stepper_home()
 {
-  stepper1.step_count = 4294967295;
+  stepper1.step_count = INT32_MAX;
   stepper1.direction = DIR_CCW;
   stepper1.step_count_setpoint = 0;
   stepper1.stop_requested = false;
@@ -72,19 +72,14 @@ void stepper_set_max_steps_per_second(uint32_t max_steps_per_second)
   stepper1.max_steps_per_second = max_steps_per_second;
 }
 
-void stepper_continuous_move(stepper_dir_t direction)
+bool stepper_relative_move(int32_t delta_steps)
 {
-  stepper1.direction = direction;
-  stepper1.step_count_setpoint = (direction == DIR_CW) ? 4294967295U : 0U;
-  stepper1.stop_requested = false;
-  stepper1.is_moving = true;
-  HAL_TIM_OC_Start_IT(stepper1.timer, stepper1.timer_channel);
-}
+  if (delta_steps == 0)
+  {
+    return true;
+  }
 
-bool stepper_absolute_move(uint16_t steps)
-{
-  // check if stepper is in the right state -- must be homed
-  if (steps >= stepper1.step_count)
+  if (delta_steps > 0)
   {
     stepper1.direction = DIR_CW;
   }
@@ -92,7 +87,28 @@ bool stepper_absolute_move(uint16_t steps)
   {
     stepper1.direction = DIR_CCW;
   }
-  stepper1.step_count_setpoint = steps;
+
+  HAL_GPIO_WritePin(stepper1.dir_gpio_port, stepper1.dir_gpio_pin, (GPIO_PinState)stepper1.direction);
+  stepper1.step_count_setpoint = stepper1.step_count + delta_steps;
+  stepper1.stop_requested = false;
+  stepper1.is_moving = true;
+  HAL_TIM_OC_Start_IT(stepper1.timer, stepper1.timer_channel);
+  return true;
+}
+
+bool stepper_absolute_move(uint16_t steps)
+{
+  // check if stepper is in the right state -- must be homed
+  if ((int32_t)steps >= stepper1.step_count)
+  {
+    stepper1.direction = DIR_CW;
+  }
+  else
+  {
+    stepper1.direction = DIR_CCW;
+  }
+  HAL_GPIO_WritePin(stepper1.dir_gpio_port, stepper1.dir_gpio_pin, (GPIO_PinState)stepper1.direction);
+  stepper1.step_count_setpoint = (int32_t)steps;
   stepper1.stop_requested = false;
   stepper1.is_moving = true;
   HAL_TIM_OC_Start_IT(stepper1.timer, stepper1.timer_channel); // start timer interrupt
@@ -152,11 +168,11 @@ static uint16_t calculate_ccr_increment(stepper_config_t *stepper)
   uint32_t remaining_steps = 0U;
   if (stepper->step_count_setpoint >= stepper->step_count)
   {
-    remaining_steps = stepper->step_count_setpoint - stepper->step_count;
+    remaining_steps = (uint32_t)(stepper->step_count_setpoint - stepper->step_count);
   }
   else
   {
-    remaining_steps = stepper->step_count - stepper->step_count_setpoint;
+    remaining_steps = (uint32_t)(stepper->step_count - stepper->step_count_setpoint);
   }
 
   // 5) Derive current speed from previous CCR increment.
@@ -274,7 +290,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
     {
       stepper1.step_count++;
     }
-    else if (stepper1.step_count > 0U)
+    else
     {
       stepper1.step_count--;
     }

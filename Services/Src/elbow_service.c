@@ -10,11 +10,12 @@
 #include "encoder.h"
 
 #define MICROSTEP (16)
-#define ELBOW_REDUCTION (12)
+#define ELBOW_REDUCTION (7)
 #define STEPS_PER_REV (200 * MICROSTEP * ELBOW_REDUCTION)
-#define ELBOW_MAX_STEPS_PER_SECOND (1000U)
-#define ELBOW_MAX_STEPS_PER_SECOND2 (500U)
+#define ELBOW_MAX_STEPS_PER_SECOND (5600U)
+#define ELBOW_MAX_STEPS_PER_SECOND2 (5600U)
 #define ELBOW_HOMING_SPEED_DIVISOR (10U)
+#define ELBOW_HOMING_MAX_TRAVEL_RAD (M_PI / 2.0f)
 
 // Enum for elbow motor states
 typedef enum
@@ -100,17 +101,38 @@ static elbow_state_t handle_needs_home(void)
 static elbow_state_t handle_homing(void)
 {
     uint32_t homing_speed = ELBOW_MAX_STEPS_PER_SECOND / ELBOW_HOMING_SPEED_DIVISOR;
+    int32_t homing_max_steps = (int32_t)rads_to_steps(ELBOW_HOMING_MAX_TRAVEL_RAD);
+
     if (homing_speed == 0U)
     {
         homing_speed = 1U;
     }
 
+    if (homing_max_steps <= 0)
+    {
+        send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+        return NEEDS_HOME;
+    }
+
     stepper_set_max_steps_per_second(homing_speed);
 
-    stepper_continuous_move(DIR_CCW);
+    stepper_relative_move(-homing_max_steps);
     while (switch1_state != LIMITSWITCH_PRESSED)
     {
+        if (!stepper_is_moving())
+        {
+            send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+            stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
+            return NEEDS_HOME;
+        }
         osDelay(10);
+    }
+
+    if (switch1_state != LIMITSWITCH_PRESSED)
+    {
+        send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+        stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
+        return NEEDS_HOME;
     }
 
     stepper_smooth_stop();
@@ -119,10 +141,23 @@ static elbow_state_t handle_homing(void)
         osDelay(10);
     }
 
-    stepper_continuous_move(DIR_CW);
-    while (switch1_state == LIMITSWITCH_PRESSED)
+    stepper_relative_move(homing_max_steps);
+    while (switch1_state != LIMITSWITCH_RELEASED)
     {
+        if (!stepper_is_moving())
+        {
+            send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+            stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
+            return NEEDS_HOME;
+        }
         osDelay(10);
+    }
+
+    if (switch1_state != LIMITSWITCH_RELEASED)
+    {
+        send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+        stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
+        return NEEDS_HOME;
     }
 
     stepper_smooth_stop();
@@ -174,6 +209,11 @@ static elbow_state_t handle_moving(const elbow_service_ctx_t *ctx)
         return IDLE;
     }
 
+    while (stepper_is_moving())
+    {
+        osDelay(10);
+    }
+    
     send_serial_msg(STATUS_ELBOW_MOVE_SUCCESS, steps_to_rads(ctx->move_target_steps));
     return IDLE;
 }
