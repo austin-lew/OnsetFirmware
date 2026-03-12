@@ -27,6 +27,7 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 - `<M,VALUE>`
 	- Meaning: Move command
 	- `VALUE` is parsed as a float using `sscanf("<M,%f>", ...)`
+	- `VALUE` is clamped to the elbow travel range `[0, pi/2]` before motion is commanded
 	- Action: Sends `CMD_ELBOW_MOVE` with parsed value to the elbow service queue
 
 - `<P,VALUE>`

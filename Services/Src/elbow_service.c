@@ -17,6 +17,21 @@
 #define ELBOW_HOMING_SPEED_DIVISOR (10U)
 #define ELBOW_HOMING_MAX_TRAVEL_RAD (M_PI / 2.0f)
 
+static float clamp_elbow_angle_rads(float rads)
+{
+    if (rads < 0.0f)
+    {
+        return 0.0f;
+    }
+
+    if (rads > ELBOW_HOMING_MAX_TRAVEL_RAD)
+    {
+        return ELBOW_HOMING_MAX_TRAVEL_RAD;
+    }
+
+    return rads;
+}
+
 // Enum for elbow motor states
 typedef enum
 {
@@ -179,14 +194,10 @@ static elbow_state_t handle_idle(elbow_service_ctx_t *ctx)
 
     if (msg.command == CMD_ELBOW_MOVE)
     {
-        if (msg.value < 0)
-        {
-            send_serial_msg(STATUS_ELBOW_MOVE_ERROR, msg.value);
-            return IDLE;
-        }
+        float target_rads = clamp_elbow_angle_rads(msg.value);
 
-        ctx->move_target_steps = rads_to_steps(msg.value);
-        send_serial_msg(STATUS_ELBOW_MOVING, msg.value);
+        ctx->move_target_steps = rads_to_steps(target_rads);
+        send_serial_msg(STATUS_ELBOW_MOVING, target_rads);
         return MOVING;
     }
 
