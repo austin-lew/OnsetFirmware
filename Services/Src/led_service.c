@@ -5,9 +5,9 @@
 #include <stdbool.h>
 
 #define LAUNCH_LED_SEGMENTS 5U
-#define LAUNCH_LED_R        0U
-#define LAUNCH_LED_G        200U
-#define LAUNCH_LED_B        255U
+#define LAUNCH_LED_R        255U
+#define LAUNCH_LED_G        0U
+#define LAUNCH_LED_B        0U
 
 typedef enum
 {
