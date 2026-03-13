@@ -29,7 +29,7 @@ bool register_limitswitch(limitswitch_id_t limitswitch_id, limitswitch_config_t 
     return true;
 }
 
-static limitswitch_event_t get_limitswitch_event(const limitswitch_config_t *config)
+limitswitch_event_t get_limitswitch_event(const limitswitch_config_t *config)
 {
     if (HAL_GPIO_ReadPin(config->gpio_port, config->gpio_pin) == config->pressed_state)
     {

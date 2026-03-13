@@ -67,7 +67,7 @@ static elbow_state_t init_elbow_service()
         .callback = limitswitch1_event_callback};
 
     register_limitswitch(LIMITSWITCH_1, limitswitch1_config);
-    switch1_state = LIMITSWITCH_RELEASED;
+    switch1_state = get_limitswitch_event(&limitswitch1_config);
 
     return NEEDS_HOME;
 }
@@ -103,13 +103,14 @@ static elbow_state_t handle_needs_home(void)
 {
     serial_to_elbow_msg_t msg = get_serial_msg();
 
-    if (msg.command == CMD_ELBOW_HOME)
+    if (msg.command == CMD_SERIAL_ELBOW_HOME)
     {
-        send_serial_msg(STATUS_ELBOW_HOMING, 0);
+        send_serial_msg(STATUS_ELBOW_SERIAL_HOMING, 0);
         return HOMING;
     }
 
-    send_serial_msg(STATUS_ELBOW_NEEDS_HOME, 0);
+    send_serial_msg(STATUS_ELBOW_SERIAL_NEEDS_HOME, 0);
+    osDelay(250);
     return NEEDS_HOME;
 }
 
@@ -125,7 +126,7 @@ static elbow_state_t handle_homing(void)
 
     if (homing_max_steps <= 0)
     {
-        send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+        send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
         return NEEDS_HOME;
     }
 
@@ -136,24 +137,17 @@ static elbow_state_t handle_homing(void)
     {
         if (!stepper_is_moving())
         {
-            send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
             stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
             return NEEDS_HOME;
         }
         osDelay(10);
     }
 
-    if (switch1_state != LIMITSWITCH_PRESSED)
-    {
-        send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
-        stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
-        return NEEDS_HOME;
-    }
-
     stepper_smooth_stop();
     while (stepper_is_moving())
     {
-        osDelay(10);
+        osDelay(250);
     }
 
     stepper_relative_move(homing_max_steps);
@@ -161,30 +155,23 @@ static elbow_state_t handle_homing(void)
     {
         if (!stepper_is_moving())
         {
-            send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
             stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
             return NEEDS_HOME;
         }
         osDelay(10);
     }
 
-    if (switch1_state != LIMITSWITCH_RELEASED)
-    {
-        send_serial_msg(STATUS_ELBOW_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
-        stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
-        return NEEDS_HOME;
-    }
-
     stepper_smooth_stop();
     while (stepper_is_moving())
     {
-        osDelay(10);
+        osDelay(250);
     }
-    
+
     encoder_set_position(&ENC_1_TIM, 0);
     stepper_tare();
     stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
-    send_serial_msg(STATUS_ELBOW_HOME_SUCCESS, 0);
+    send_serial_msg(STATUS_ELBOW_SERIAL_HOME_SUCCESS, 0);
     return IDLE;
 }
 
@@ -192,21 +179,22 @@ static elbow_state_t handle_idle(elbow_service_ctx_t *ctx)
 {
     serial_to_elbow_msg_t msg = get_serial_msg();
 
-    if (msg.command == CMD_ELBOW_MOVE)
+    if (msg.command == CMD_SERIAL_ELBOW_MOVE)
     {
         float target_rads = clamp_elbow_angle_rads(msg.value);
 
         ctx->move_target_steps = rads_to_steps(target_rads);
-        send_serial_msg(STATUS_ELBOW_MOVING, target_rads);
+        send_serial_msg(STATUS_ELBOW_SERIAL_MOVING, target_rads);
         return MOVING;
     }
 
-    if (msg.command == CMD_ELBOW_HOME)
+    if (msg.command == CMD_SERIAL_ELBOW_HOME)
     {
-        send_serial_msg(STATUS_ELBOW_HOMING, 0);
+        send_serial_msg(STATUS_ELBOW_SERIAL_HOMING, 0);
         return HOMING;
     }
 
+    osDelay(250);
     return IDLE;
 }
 
@@ -216,16 +204,16 @@ static elbow_state_t handle_moving(const elbow_service_ctx_t *ctx)
 
     if (!move_started)
     {
-        send_serial_msg(STATUS_ELBOW_MOVE_ERROR, steps_to_rads(ctx->move_target_steps));
+        send_serial_msg(STATUS_ELBOW_SERIAL_MOVE_ERROR, steps_to_rads(ctx->move_target_steps));
         return IDLE;
     }
 
     while (stepper_is_moving())
     {
-        osDelay(10);
+        osDelay(250);
     }
-    
-    send_serial_msg(STATUS_ELBOW_MOVE_SUCCESS, steps_to_rads(ctx->move_target_steps));
+
+    send_serial_msg(STATUS_ELBOW_SERIAL_MOVE_SUCCESS, steps_to_rads(ctx->move_target_steps));
     return IDLE;
 }
 

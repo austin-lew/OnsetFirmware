@@ -120,6 +120,16 @@ osMessageQueueId_t precharge_to_ledHandle;
 const osMessageQueueAttr_t precharge_to_led_attributes = {
   .name = "precharge_to_led"
 };
+/* Definitions for serial_to_led */
+osMessageQueueId_t serial_to_ledHandle;
+const osMessageQueueAttr_t serial_to_led_attributes = {
+  .name = "serial_to_led"
+};
+/* Definitions for led_to_serial */
+osMessageQueueId_t led_to_serialHandle;
+const osMessageQueueAttr_t led_to_serial_attributes = {
+  .name = "led_to_serial"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -172,6 +182,12 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of precharge_to_led */
   precharge_to_ledHandle = osMessageQueueNew (16, sizeof(precharge_to_led_msg_t), &precharge_to_led_attributes);
+
+  /* creation of serial_to_led */
+  serial_to_ledHandle = osMessageQueueNew (16, sizeof(serial_to_led_msg_t), &serial_to_led_attributes);
+
+  /* creation of led_to_serial */
+  led_to_serialHandle = osMessageQueueNew (16, sizeof(led_to_serial_msg_t), &led_to_serial_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */

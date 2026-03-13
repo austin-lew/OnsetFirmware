@@ -43,6 +43,8 @@ extern "C"
     limitswitch_callback_t callback;
   } limitswitch_config_t;
 
+  limitswitch_event_t get_limitswitch_event(const limitswitch_config_t *config);
+
   bool register_limitswitch(limitswitch_id_t limitswitch_id,
                             limitswitch_config_t config);
 

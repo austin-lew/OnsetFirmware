@@ -22,20 +22,28 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 
 - `<H>`
 	- Meaning: Home command
-	- Action: Sends `CMD_ELBOW_HOME` to the elbow service queue
+	- Action: Sends `CMD_SERIAL_ELBOW_HOME` to the elbow service queue
 
 - `<M,VALUE>`
 	- Meaning: Move command
 	- `VALUE` is parsed as a float using `sscanf("<M,%f>", ...)`
 	- `VALUE` is clamped to the elbow travel range `[0, pi/2]` before motion is commanded
-	- Action: Sends `CMD_ELBOW_MOVE` with parsed value to the elbow service queue
+	- Action: Sends `CMD_SERIAL_ELBOW_MOVE` with parsed value to the elbow service queue
 
 - `<P,VALUE>`
 	- Meaning: Precharge power command
 	- `VALUE` is parsed as an integer using `sscanf("<P,%d>", ...)`
 	- Action:
-		- `VALUE == 0` sends `CMD_PRECHARGE_OFF` to the precharge service queue
-		- `VALUE != 0` sends `CMD_PRECHARGE_ON` to the precharge service queue
+		- `VALUE == 0` sends `CMD_SERIAL_PRECHARGE_OFF` to the precharge service queue
+		- `VALUE != 0` sends `CMD_SERIAL_PRECHARGE_ON` to the precharge service queue
+
+- `<L,VALUE>` / `<L,VALUE,R,G,B>`
+	- Meaning: LED command
+	- `VALUE` is parsed as an integer using `sscanf("<L,%d>", ...)`
+	- Action:
+		- `VALUE == 0` sends `CMD_SERIAL_LED_OFF` to the LED service queue
+		- `VALUE == 1` sends `CMD_SERIAL_LED_LAUNCH` to the LED service queue
+		- `VALUE == 2` parses `R`, `G`, `B` as integers using `sscanf("<L,%d,%d,%d,%d>", ...)` and sends `CMD_SERIAL_LED_SINGLE_COLOUR` with those colour values to the LED service queue
 
 ### RX parser behavior
 - Incoming bytes are read from the USB RX ring buffer.
@@ -56,7 +64,7 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 ## TX (STM32 -> Host)
 
 ### Packet format
-- `<SW2,SW3,ELBOW_STATUS,PRECHARGE_STATUS>`
+- `<SW2,SW3,ELBOW_STATUS,PRECHARGE_STATUS,LED_STATUS>`
 - All fields are emitted as unsigned integer ASCII values.
 
 ### Field definitions
@@ -69,18 +77,24 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 	- `1` = `LIMITSWITCH_PRESSED`
 
 - `ELBOW_STATUS`: `elbow_to_serial_status_t`
-	- `0` = `STATUS_ELBOW_NEEDS_HOME`
-	- `1` = `STATUS_ELBOW_HOMING`
-	- `2` = `STATUS_ELBOW_HOME_ERROR`
-	- `3` = `STATUS_ELBOW_HOME_SUCCESS`
-	- `4` = `STATUS_ELBOW_MOVING`
-	- `5` = `STATUS_ELBOW_MOVE_SUCCESS`
-	- `6` = `STATUS_ELBOW_MOVE_ERROR`
+	- `0` = `STATUS_ELBOW_SERIAL_NEEDS_HOME`
+	- `1` = `STATUS_ELBOW_SERIAL_HOMING`
+	- `2` = `STATUS_ELBOW_SERIAL_HOME_ERROR`
+	- `3` = `STATUS_ELBOW_SERIAL_HOME_SUCCESS`
+	- `4` = `STATUS_ELBOW_SERIAL_MOVING`
+	- `5` = `STATUS_ELBOW_SERIAL_MOVE_SUCCESS`
+	- `6` = `STATUS_ELBOW_SERIAL_MOVE_ERROR`
 
 - `PRECHARGE_STATUS`: `precharge_to_serial_status_t`
-	- `0` = `STATUS_PRECHARGE_OFF`
-	- `1` = `STATUS_PRECHARGE_PRECHARGE_ON`
-	- `2` = `STATUS_PRECHARGE_MAIN_POWER_ON`
+	- `0` = `STATUS_PRECHARGE_SERIAL_OFF`
+	- `1` = `STATUS_PRECHARGE_SERIAL_PRECHARGE_ON`
+	- `2` = `STATUS_PRECHARGE_SERIAL_MAIN_POWER_ON`
+
+- `LED_STATUS`: `led_to_serial_status_t`
+	- `0` = `STATUS_LED_SERIAL_DISABLED`
+	- `1` = `STATUS_LED_SERIAL_OFF`
+	- `2` = `STATUS_LED_SERIAL_LAUNCH`
+	- `3` = `STATUS_LED_SERIAL_SINGLE_COLOUR`
 
 ### TX behavior
 - TX uses the current values of:
@@ -88,15 +102,16 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 	- limit switch 3 state
 	- latest elbow status
 	- latest precharge status
+	- latest LED status
 - TX is triggered by any of the following:
 	- host sends `<S>`
 	- either limit switch changes state
 	- elbow service publishes a new status
 	- precharge service publishes a new status
+	- LED service publishes a new status
 - TX is non-blocking and checks CDC busy state before starting a new transfer.
 - If USB is busy or the USB stack rejects the transmit request, TX retries in later serial service iterations.
 - The serial service task runs every `10 ms`, so status responses and retries are quantized to that cadence.
-- Elbow and precharge services send internal queue messages that include extra fields, but the USB TX packet currently exports only the four integer fields shown above.
 
 ## Examples
 - Host -> STM32
@@ -105,9 +120,12 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 	- `<M,1.5708>`
 	- `<P,1>`
 	- `<P,0>`
+	- `<L,1>`
+	- `<L,2,255,0,128>`
+	- `<L,0>`
 
 - STM32 -> Host
 	- `[Onset] Ready\r\n`
-	- `<1,1,0,0>`
-	- `<0,1,4,1>`
-	- `<0,0,5,2>`
+	- `<1,1,0,0,0>`
+	- `<0,1,4,1,1>`
+	- `<0,0,5,2,2>`
