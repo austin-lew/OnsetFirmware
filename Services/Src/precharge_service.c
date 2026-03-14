@@ -65,7 +65,7 @@ static precharge_state_t init_precharge_service()
     #endif
 }
 
-precharge_state_t handle_power_off_state()
+static precharge_state_t handle_power_off_state(void)
 {
     precharge_off();
     main_power_off();
@@ -83,7 +83,7 @@ precharge_state_t handle_power_off_state()
 }
 
 
-precharge_state_t handle_precharge_on_state()
+static precharge_state_t handle_precharge_on_state(void)
 {
     precharge_on();
     main_power_off();
@@ -102,7 +102,7 @@ precharge_state_t handle_precharge_on_state()
     return MAIN_POWER_ON;
 }
 
-precharge_state_t handle_main_power_on_state()
+static precharge_state_t handle_main_power_on_state(void)
 {
     #if PRECHARGE_TEMP_BYPASS_MODE
     drain_ignored_precharge_commands();

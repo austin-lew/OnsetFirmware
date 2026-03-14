@@ -145,7 +145,10 @@ static led_state_t handle_led_launch(void)
         {
             led_set_pixel(i, LAUNCH_LED_R, LAUNCH_LED_G, LAUNCH_LED_B);
         }
-        led_transmit();
+        while (led_transmit() == HAL_BUSY)
+        {
+            osDelay(1);
+        }
         osDelay(1000);
     }
     led_clear();
