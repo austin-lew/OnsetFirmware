@@ -49,11 +49,13 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ./Drivers/Custom/Src/stepper_driver.c
     ./Drivers/Custom/Src/encoder.c
     ./Drivers/Custom/Src/led_driver.c
+    ./Drivers/Custom/Src/servo_driver.c
     ./Services/Src/heartbeat_service.c
     ./Services/Src/elbow_service.c
     ./Services/Src/serial_service.c
     ./Services/Src/precharge_service.c
     ./Services/Src/led_service.c
+    ./Services/Src/loader_service.c
 )
 
 # Add include paths

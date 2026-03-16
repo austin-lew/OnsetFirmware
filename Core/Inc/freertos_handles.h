@@ -136,6 +136,35 @@ extern "C"
 
     extern osMessageQueueId_t led_to_serialHandle;
 
+    /* Serial to Loader Message Passing       -------------------------------------*/
+
+    typedef enum
+    {
+        CMD_SERIAL_LOADER_LOAD = 0,
+    } serial_to_loader_cmd_t;
+
+    typedef struct
+    {
+        serial_to_loader_cmd_t command;
+    } serial_to_loader_msg_t;
+
+    extern osMessageQueueId_t serial_to_loaderHandle;
+
+    /* Loader to Serial Message Passing       -------------------------------------*/
+
+    typedef enum
+    {
+        STATUS_LOADER_SERIAL_IDLE = 0,
+        STATUS_LOADER_SERIAL_LOADING = 1,
+    } loader_to_serial_status_t;
+
+    typedef struct
+    {
+        loader_to_serial_status_t status;
+    } loader_to_serial_msg_t;
+
+    extern osMessageQueueId_t loader_to_serialHandle;
+
 #ifdef __cplusplus
 }
 #endif

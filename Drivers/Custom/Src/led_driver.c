@@ -8,13 +8,38 @@
 /* Includes ------------------------------------------------------------------*/
 #include "led_driver.h"
 #include "main.h"
-#include "tim.h"
+
+typedef struct
+{
+    TIM_HandleTypeDef *timer;
+    uint32_t timer_channel;
+    uint32_t active_channel;
+    bool initialized;
+} led_driver_config_t;
 
 static led_rgb_t s_led_colors[LED_DRIVER_MAX_LEDS];
 static uint32_t s_pwm_symbols[(LED_DRIVER_MAX_LEDS * WS2812_BITS_PER_LED) + WS2812_RESET_SLOTS];
 static uint16_t s_led_count = 1U;
 static uint16_t s_symbol_count = 0U;
 static volatile bool s_tx_busy = false;
+static led_driver_config_t s_led_driver = {0};
+
+static uint32_t timer_channel_to_active_channel(uint32_t timer_channel)
+{
+    switch (timer_channel)
+    {
+    case TIM_CHANNEL_1:
+        return HAL_TIM_ACTIVE_CHANNEL_1;
+    case TIM_CHANNEL_2:
+        return HAL_TIM_ACTIVE_CHANNEL_2;
+    case TIM_CHANNEL_3:
+        return HAL_TIM_ACTIVE_CHANNEL_3;
+    case TIM_CHANNEL_4:
+        return HAL_TIM_ACTIVE_CHANNEL_4;
+    default:
+        return HAL_TIM_ACTIVE_CHANNEL_CLEARED;
+    }
+}
 
 static uint16_t clamp_led_count(uint16_t requested)
 {
@@ -58,15 +83,27 @@ static void encode_frame(void)
     s_symbol_count = symbol_index;
 }
 
-void led_driver_init(uint16_t led_count)
+void led_driver_init(TIM_HandleTypeDef *timer, uint32_t timer_channel, uint16_t led_count)
 {
     s_led_count = clamp_led_count(led_count);
+    s_led_driver.timer = timer;
+    s_led_driver.timer_channel = timer_channel;
+    s_led_driver.active_channel = timer_channel_to_active_channel(timer_channel);
+    s_led_driver.initialized = false;
 
-    htim2.Init.Prescaler = 0U;
-    htim2.Init.Period = WS2812_TIMER_PERIOD_TICKS - 1U;
-    __HAL_TIM_SET_AUTORELOAD(&htim2, WS2812_TIMER_PERIOD_TICKS - 1U);
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0U);
-    __HAL_TIM_ENABLE_OCxPRELOAD(&htim2, TIM_CHANNEL_3);
+    if ((s_led_driver.timer == NULL) ||
+        (s_led_driver.timer->Instance == NULL) ||
+        (s_led_driver.active_channel == HAL_TIM_ACTIVE_CHANNEL_CLEARED))
+    {
+        led_clear();
+        return;
+    }
+
+    s_led_driver.timer->Init.Period = WS2812_TIMER_PERIOD_TICKS - 1U;
+    __HAL_TIM_SET_AUTORELOAD(s_led_driver.timer, WS2812_TIMER_PERIOD_TICKS - 1U);
+    __HAL_TIM_SET_COMPARE(s_led_driver.timer, s_led_driver.timer_channel, 0U);
+    __HAL_TIM_ENABLE_OCxPRELOAD(s_led_driver.timer, s_led_driver.timer_channel);
+    s_led_driver.initialized = true;
 
     led_clear();
 }
@@ -103,6 +140,11 @@ HAL_StatusTypeDef led_transmit(void)
 {
     HAL_StatusTypeDef status;
 
+    if (!s_led_driver.initialized)
+    {
+        return HAL_ERROR;
+    }
+
     if (s_tx_busy)
     {
         return HAL_BUSY;
@@ -111,8 +153,8 @@ HAL_StatusTypeDef led_transmit(void)
     encode_frame();
 
     s_tx_busy = true;
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0U);
-    status = HAL_TIM_PWM_Start_DMA(&htim2, TIM_CHANNEL_3, s_pwm_symbols, s_symbol_count);
+    __HAL_TIM_SET_COMPARE(s_led_driver.timer, s_led_driver.timer_channel, 0U);
+    status = HAL_TIM_PWM_Start_DMA(s_led_driver.timer, s_led_driver.timer_channel, s_pwm_symbols, s_symbol_count);
 
     if (status != HAL_OK)
     {
@@ -129,10 +171,13 @@ bool led_is_busy(void)
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
-    if ((htim != NULL) && (htim->Instance == TIM2) && (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_3))
+    if ((htim == s_led_driver.timer) &&
+        s_led_driver.initialized &&
+        (htim != NULL) &&
+        (htim->Channel == s_led_driver.active_channel))
     {
-        (void)HAL_TIM_PWM_Stop_DMA(&htim2, TIM_CHANNEL_3);
-        __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0U);
+        (void)HAL_TIM_PWM_Stop_DMA(s_led_driver.timer, s_led_driver.timer_channel);
+        __HAL_TIM_SET_COMPARE(s_led_driver.timer, s_led_driver.timer_channel, 0U);
         s_tx_busy = false;
     }
 }

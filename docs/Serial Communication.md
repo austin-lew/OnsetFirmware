@@ -45,6 +45,10 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 		- `VALUE == 1` sends `CMD_SERIAL_LED_LAUNCH` to the LED service queue
 		- `VALUE == 2` parses `R`, `G`, `B` as integers using `sscanf("<L,%d,%d,%d,%d>", ...)` and sends `CMD_SERIAL_LED_SINGLE_COLOUR` with those colour values to the LED service queue
 
+- `<B>`
+	- Meaning: Loader command
+	- Action: Sends `CMD_SERIAL_LOADER_LOAD` to the loader service queue
+
 ### RX parser behavior
 - Incoming bytes are read from the USB RX ring buffer.
 - Parser scans byte-by-byte for framed messages.
@@ -64,7 +68,7 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 ## TX (STM32 -> Host)
 
 ### Packet format
-- `<SW2,SW3,ELBOW_STATUS,PRECHARGE_STATUS,LED_STATUS>`
+- `<SW2,SW3,ELBOW_STATUS,PRECHARGE_STATUS,LED_STATUS,LOADER_STATUS>`
 - All fields are emitted as unsigned integer ASCII values.
 
 ### Field definitions
@@ -96,6 +100,10 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 	- `2` = `STATUS_LED_SERIAL_LAUNCH`
 	- `3` = `STATUS_LED_SERIAL_SINGLE_COLOUR`
 
+- `LOADER_STATUS`: `loader_to_serial_status_t`
+	- `0` = `STATUS_LOADER_SERIAL_IDLE`
+	- `1` = `STATUS_LOADER_SERIAL_LOADING`
+
 ### TX behavior
 - TX uses the current values of:
 	- limit switch 2 state
@@ -103,12 +111,14 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 	- latest elbow status
 	- latest precharge status
 	- latest LED status
+	- latest loader status
 - TX is triggered by any of the following:
 	- host sends `<S>`
 	- either limit switch changes state
 	- elbow service publishes a new status
 	- precharge service publishes a new status
 	- LED service publishes a new status
+	- loader service publishes a new status
 - TX is non-blocking and checks CDC busy state before starting a new transfer.
 - If USB is busy or the USB stack rejects the transmit request, TX retries in later serial service iterations.
 - The serial service task runs every `10 ms`, so status responses and retries are quantized to that cadence.
@@ -123,9 +133,10 @@ This is an ASCII based protocol. Command and status packets start with a `<` and
 	- `<L,1>`
 	- `<L,2,255,0,128>`
 	- `<L,0>`
+	- `<B>`
 
 - STM32 -> Host
 	- `[Onset] Ready\r\n`
-	- `<1,1,0,0,0>`
-	- `<0,1,4,1,1>`
-	- `<0,0,5,2,2>`
+	- `<1,1,0,0,0,0>`
+	- `<0,1,4,1,1,0>`
+	- `<0,0,5,2,2,1>`

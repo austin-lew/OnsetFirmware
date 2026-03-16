@@ -3,6 +3,7 @@
 #include "freertos_handles.h"
 #include "cmsis_os2.h"
 #include <stdbool.h>
+#include "tim.h"
 
 #define LAUNCH_LED_SEGMENTS 5U
 #define LAUNCH_LED_R        255U
@@ -26,7 +27,7 @@ static void publish_led_status(led_to_serial_status_t status)
 
 static led_state_t init_led_service()
 {
-    led_driver_init(64);
+    led_driver_init(&htim2, TIM_CHANNEL_4, 64);
     led_disable();
     return LED_DISABLED;
 }

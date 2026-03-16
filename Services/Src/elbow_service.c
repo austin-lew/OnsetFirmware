@@ -59,7 +59,7 @@ static elbow_state_t init_elbow_service()
 {
     encoder_init(&ENC_1_TIM);
 
-    stepper_init(&htim3, TIM_CHANNEL_1, ELBOW_MAX_STEPS_PER_SECOND, ELBOW_MAX_STEPS_PER_SECOND2, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
+    stepper_init(&htim15, TIM_CHANNEL_1, ELBOW_MAX_STEPS_PER_SECOND, ELBOW_MAX_STEPS_PER_SECOND2, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
     limitswitch_config_t limitswitch1_config = {
         .gpio_port = LIMIT_SW_1_GPIO_Port,
         .gpio_pin = LIMIT_SW_1_Pin,

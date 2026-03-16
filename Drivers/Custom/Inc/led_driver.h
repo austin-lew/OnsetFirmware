@@ -35,7 +35,7 @@ typedef struct
 	uint8_t b;
 } led_rgb_t;
 
-void led_driver_init(uint16_t led_count);
+void led_driver_init(TIM_HandleTypeDef *timer, uint32_t timer_channel, uint16_t led_count);
 HAL_StatusTypeDef led_set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);
 void led_set_all(uint8_t r, uint8_t g, uint8_t b);
 void led_clear(void);

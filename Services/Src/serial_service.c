@@ -24,6 +24,7 @@ typedef struct
     elbow_to_serial_status_t elbow_status;
     precharge_to_serial_status_t precharge_status;
     led_to_serial_status_t led_status;
+    loader_to_serial_status_t loader_status;
 } tx_data_t;
 
 tx_data_t tx_data;
@@ -219,6 +220,13 @@ static serial_state_t parse_rx_packet(char *packet)
         }
         return SERIAL_IDLE;
     }
+    case 'B':
+    {
+        serial_to_loader_msg_t msg = {
+            .command = CMD_SERIAL_LOADER_LOAD};
+        osMessageQueuePut(serial_to_loaderHandle, &msg, 0, 0);
+        return SERIAL_IDLE;
+    }
     default:
         return SERIAL_IDLE;
     }
@@ -273,6 +281,7 @@ static serial_state_t init_serial_service()
     tx_data.elbow_status = STATUS_ELBOW_SERIAL_NEEDS_HOME;
     tx_data.precharge_status = STATUS_PRECHARGE_SERIAL_OFF;
     tx_data.led_status = STATUS_LED_SERIAL_DISABLED;
+    tx_data.loader_status = STATUS_LOADER_SERIAL_IDLE;
     last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
 
     while (usb_tx_busy())
@@ -285,7 +294,7 @@ static serial_state_t init_serial_service()
 }
 
 /**
- * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow,precharge>.
+ * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow,precharge,led,loader>.
  */
 static void update_tx_buffer(void)
 {
@@ -294,16 +303,18 @@ static void update_tx_buffer(void)
     elbow_to_serial_status_t elbow_status = tx_data.elbow_status;
     precharge_to_serial_status_t precharge_status = tx_data.precharge_status;
     led_to_serial_status_t led_status = tx_data.led_status;
+    loader_to_serial_status_t loader_status = tx_data.loader_status;
 
     char local_buffer[APP_TX_DATA_SIZE];
     int written = snprintf(local_buffer,
                            sizeof(local_buffer),
-                           "<%u,%u,%u,%u,%u>",
+                           "<%u,%u,%u,%u,%u,%u>",
                            (unsigned int)switch2_status,
                            (unsigned int)switch3_status,
                            (unsigned int)elbow_status,
                            (unsigned int)precharge_status,
-                           (unsigned int)led_status);
+                           (unsigned int)led_status,
+                           (unsigned int)loader_status);
 
     if (written <= 0)
     {
@@ -358,6 +369,14 @@ static serial_state_t handle_idle(void)
         led_to_serial_msg_t msg;
         osMessageQueueGet(led_to_serialHandle, &msg, NULL, 0);
         tx_data.led_status = msg.status;
+        return SERIAL_TX;
+    }
+
+    if (osMessageQueueGetCount(loader_to_serialHandle) > 0)
+    {
+        loader_to_serial_msg_t msg;
+        osMessageQueueGet(loader_to_serialHandle, &msg, NULL, 0);
+        tx_data.loader_status = msg.status;
         return SERIAL_TX;
     }
 
