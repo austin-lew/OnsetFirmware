@@ -54,20 +54,10 @@ void stepper_init(TIM_HandleTypeDef *timer,
   stepper1.step_phase = false;
 }
 
-void stepper_home()
-{
-  stepper1.step_count = INT32_MAX;
-  stepper1.direction = DIR_CCW;
-  stepper1.step_count_setpoint = 0;
-  stepper1.stop_requested = false;
-  stepper1.is_moving = true;
-  stepper1.step_phase = false;
-  HAL_TIM_OC_Start_IT(stepper1.timer, stepper1.timer_channel); // start
-}
-
 void stepper_tare()
 {
   stepper1.step_count = 0;
+  stepper1.ccr_increment = 0;
 }
 
 void stepper_set_max_steps_per_second(uint32_t max_steps_per_second)
@@ -79,6 +69,10 @@ bool stepper_relative_move(int32_t delta_steps)
 {
   if (delta_steps == 0)
   {
+    stepper1.ccr_increment = 0;
+    stepper1.stop_requested = false;
+    stepper1.is_moving = false;
+    stepper1.step_phase = false;
     return true;
   }
 
@@ -93,6 +87,7 @@ bool stepper_relative_move(int32_t delta_steps)
 
   HAL_GPIO_WritePin(stepper1.dir_gpio_port, stepper1.dir_gpio_pin, (GPIO_PinState)stepper1.direction);
   stepper1.step_count_setpoint = stepper1.step_count + delta_steps;
+  stepper1.ccr_increment = 0;
   stepper1.stop_requested = false;
   stepper1.is_moving = true;
   stepper1.step_phase = false;
@@ -102,8 +97,19 @@ bool stepper_relative_move(int32_t delta_steps)
 
 bool stepper_absolute_move(uint16_t steps)
 {
+  int32_t target_steps = (int32_t)steps;
+
+  if (target_steps == stepper1.step_count)
+  {
+    stepper1.ccr_increment = 0;
+    stepper1.stop_requested = false;
+    stepper1.is_moving = false;
+    stepper1.step_phase = false;
+    return true;
+  }
+
   // check if stepper is in the right state -- must be homed
-  if ((int32_t)steps >= stepper1.step_count)
+  if (target_steps >= stepper1.step_count)
   {
     stepper1.direction = DIR_CW;
   }
@@ -112,7 +118,8 @@ bool stepper_absolute_move(uint16_t steps)
     stepper1.direction = DIR_CCW;
   }
   HAL_GPIO_WritePin(stepper1.dir_gpio_port, stepper1.dir_gpio_pin, (GPIO_PinState)stepper1.direction);
-  stepper1.step_count_setpoint = (int32_t)steps;
+  stepper1.step_count_setpoint = target_steps;
+  stepper1.ccr_increment = 0;
   stepper1.stop_requested = false;
   stepper1.is_moving = true;
   stepper1.step_phase = false;
@@ -129,8 +136,10 @@ bool stepper_smooth_stop(void)
 
 bool stepper_emergency_stop(void)
 {
+  stepper1.ccr_increment = 0;
   stepper1.stop_requested = false;
   stepper1.is_moving = false;
+  stepper1.step_phase = false;
   HAL_TIM_OC_Stop_IT(stepper1.timer, stepper1.timer_channel); // stop timer interrupt
   // update state
   return true;
@@ -162,6 +171,8 @@ static uint16_t calculate_ccr_increment(stepper_config_t *stepper)
   {
     return 0U;
   }
+
+  float min_realizable_speed = (float)timer_tick_freq / (65535.0f * 2.0f);
 
   // 3) Stop condition for finite (absolute) moves.
   if (!stepper->stop_requested && (stepper->step_count == stepper->step_count_setpoint))
@@ -261,9 +272,19 @@ static uint16_t calculate_ccr_increment(stepper_config_t *stepper)
     return 0U;
   }
 
+  if (stepper->stop_requested && (new_speed <= min_realizable_speed))
+  {
+    return 0U;
+  }
+
   float ccr = (float)timer_tick_freq / (new_speed * 2.0f);
   if (ccr > 65535.0f)
   {
+    if (stepper->stop_requested)
+    {
+      return 0U;
+    }
+
     return 65535U;
   }
 
@@ -274,7 +295,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 {
   switch ((unsigned long)htim->Instance)
   {
-  case TIM3_BASE:
+  case TIM15_BASE:
     // Toggle the step phase: even calls are rising edges (physical steps),
     // odd calls are falling edges. Only advance position on rising edges.
     stepper1.step_phase = !stepper1.step_phase;
@@ -284,6 +305,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
       // A) End finite move when setpoint has been reached.
       if (!stepper1.stop_requested && (stepper1.step_count_setpoint == stepper1.step_count))
       {
+        stepper1.ccr_increment = 0;
         stepper1.is_moving = false;
         HAL_TIM_OC_Stop_IT(stepper1.timer, stepper1.timer_channel);
         break;
@@ -293,8 +315,10 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
       stepper1.ccr_increment = calculate_ccr_increment(&stepper1);
       if (stepper1.ccr_increment == 0U)
       {
+        stepper1.ccr_increment = 0;
         stepper1.stop_requested = false;
         stepper1.is_moving = false;
+        stepper1.step_phase = false;
         HAL_TIM_OC_Stop_IT(stepper1.timer, stepper1.timer_channel);
         break;
       }
