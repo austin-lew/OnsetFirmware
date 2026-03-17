@@ -65,12 +65,14 @@ static led_state_t handle_led_ready(void)
         {
         case CMD_SERIAL_LED_LAUNCH:
             led_enable();
+            osDelay(10);
             led_clear();
             led_transmit();
             publish_led_status(STATUS_LED_SERIAL_LAUNCH);
             return LED_LAUNCH;
         case CMD_SERIAL_LED_SINGLE_COLOUR:
             led_enable();
+            osDelay(10);
             led_set_all(serial_msg.r, serial_msg.g, serial_msg.b);
             led_transmit();
             publish_led_status(STATUS_LED_SERIAL_SINGLE_COLOUR);
