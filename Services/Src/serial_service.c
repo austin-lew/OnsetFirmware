@@ -8,6 +8,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#define WELCOME_MSG "[Onset] Ready\r\n"
+
 typedef enum
 {
     SERIAL_IDLE,
@@ -21,6 +23,8 @@ typedef struct
     volatile limitswitch_event_t switch3_status;
     elbow_to_serial_status_t elbow_status;
     precharge_to_serial_status_t precharge_status;
+    led_to_serial_status_t led_status;
+    loader_to_serial_status_t loader_status;
 } tx_data_t;
 
 tx_data_t tx_data;
@@ -163,7 +167,7 @@ static serial_state_t parse_rx_packet(char *packet)
     case 'H':
     {
         serial_to_elbow_msg_t msg = {
-            .command = CMD_HOME,
+            .command = CMD_SERIAL_ELBOW_HOME,
             .value = 0};
         osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         return SERIAL_IDLE;
@@ -174,7 +178,7 @@ static serial_state_t parse_rx_packet(char *packet)
         if (sscanf(packet, "<M,%f>", &value) == 1)
         {
             serial_to_elbow_msg_t msg = {
-                .command = CMD_MOVE,
+                .command = CMD_SERIAL_ELBOW_MOVE,
                 .value = value};
             osMessageQueuePut(serial_to_elbowHandle, &msg, 0, 0);
         }
@@ -186,9 +190,41 @@ static serial_state_t parse_rx_packet(char *packet)
         if (sscanf(packet, "<P,%d>", &value) == 1)
         {
             serial_to_precharge_msg_t msg = {
-                .command = (value == 0) ? CMD_OFF : CMD_ON};
+                .command = (value == 0) ? CMD_SERIAL_PRECHARGE_OFF : CMD_SERIAL_PRECHARGE_ON};
             osMessageQueuePut(serial_to_prechargeHandle, &msg, 0, 0);
         }
+        return SERIAL_IDLE;
+    }
+    case 'L':
+    {
+        int value = 0;
+        if (sscanf(packet, "<L,%d>", &value) == 1)
+        {
+            serial_to_led_msg_t msg = {.command = CMD_SERIAL_LED_OFF, .r = 0U, .g = 0U, .b = 0U};
+            if (value == (int)CMD_SERIAL_LED_LAUNCH)
+            {
+                msg.command = CMD_SERIAL_LED_LAUNCH;
+            }
+            else if (value == (int)CMD_SERIAL_LED_SINGLE_COLOUR)
+            {
+                int r = 0, g = 0, b = 0;
+                if (sscanf(packet, "<L,%d,%d,%d,%d>", &value, &r, &g, &b) == 4)
+                {
+                    msg.command = CMD_SERIAL_LED_SINGLE_COLOUR;
+                    msg.r = (uint8_t)r;
+                    msg.g = (uint8_t)g;
+                    msg.b = (uint8_t)b;
+                }
+            }
+            osMessageQueuePut(serial_to_ledHandle, &msg, 0, 0);
+        }
+        return SERIAL_IDLE;
+    }
+    case 'B':
+    {
+        serial_to_loader_msg_t msg = {
+            .command = CMD_SERIAL_LOADER_LOAD};
+        osMessageQueuePut(serial_to_loaderHandle, &msg, 0, 0);
         return SERIAL_IDLE;
     }
     default:
@@ -221,13 +257,13 @@ static void limitswitch3_event_callback(limitswitch_event_t event)
 limitswitch_config_t limitswitch2_config = {
     .gpio_port = LIMIT_SW_2_GPIO_Port,
     .gpio_pin = LIMIT_SW_2_Pin,
-    .pressed_state = GPIO_PIN_RESET,
+    .pressed_state = GPIO_PIN_SET,
     .callback = limitswitch2_event_callback};
 
 limitswitch_config_t limitswitch3_config = {
     .gpio_port = LIMIT_SW_3_GPIO_Port,
     .gpio_pin = LIMIT_SW_3_Pin,
-    .pressed_state = GPIO_PIN_RESET,
+    .pressed_state = GPIO_PIN_SET,
     .callback = limitswitch3_event_callback};
 
 /**
@@ -242,14 +278,23 @@ static serial_state_t init_serial_service()
 
     tx_data.switch2_status = (HAL_GPIO_ReadPin(LIMIT_SW_2_GPIO_Port, LIMIT_SW_2_Pin) == limitswitch2_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
     tx_data.switch3_status = (HAL_GPIO_ReadPin(LIMIT_SW_3_GPIO_Port, LIMIT_SW_3_Pin) == limitswitch3_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
-    tx_data.elbow_status = STATUS_NEEDS_HOME;
-    tx_data.precharge_status = STATUS_OFF;
+    tx_data.elbow_status = STATUS_ELBOW_SERIAL_NEEDS_HOME;
+    tx_data.precharge_status = STATUS_PRECHARGE_SERIAL_OFF;
+    tx_data.led_status = STATUS_LED_SERIAL_DISABLED;
+    tx_data.loader_status = STATUS_LOADER_SERIAL_IDLE;
     last_transmitted_limitswitch_change_counter = limitswitch_change_counter;
+
+    while (usb_tx_busy())
+    {
+        osDelay(10);
+    }
+    CDC_Transmit_FS((uint8_t *)WELCOME_MSG, sizeof(WELCOME_MSG) - 1U);
+
     return SERIAL_IDLE;
 }
 
 /**
- * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow,precharge>.
+ * @brief Serializes TX status fields into an ASCII frame: <s2,s3,elbow,precharge,led,loader>.
  */
 static void update_tx_buffer(void)
 {
@@ -257,15 +302,19 @@ static void update_tx_buffer(void)
     limitswitch_event_t switch3_status = tx_data.switch3_status;
     elbow_to_serial_status_t elbow_status = tx_data.elbow_status;
     precharge_to_serial_status_t precharge_status = tx_data.precharge_status;
+    led_to_serial_status_t led_status = tx_data.led_status;
+    loader_to_serial_status_t loader_status = tx_data.loader_status;
 
     char local_buffer[APP_TX_DATA_SIZE];
     int written = snprintf(local_buffer,
                            sizeof(local_buffer),
-                           "<%u,%u,%u,%u>",
+                           "<%u,%u,%u,%u,%u,%u>",
                            (unsigned int)switch2_status,
                            (unsigned int)switch3_status,
                            (unsigned int)elbow_status,
-                           (unsigned int)precharge_status);
+                           (unsigned int)precharge_status,
+                           (unsigned int)led_status,
+                           (unsigned int)loader_status);
 
     if (written <= 0)
     {
@@ -312,6 +361,22 @@ static serial_state_t handle_idle(void)
         precharge_to_serial_msg_t msg;
         osMessageQueueGet(precharge_to_serialHandle, &msg, NULL, 0);
         tx_data.precharge_status = msg.status;
+        return SERIAL_TX;
+    }
+
+    if (osMessageQueueGetCount(led_to_serialHandle) > 0)
+    {
+        led_to_serial_msg_t msg;
+        osMessageQueueGet(led_to_serialHandle, &msg, NULL, 0);
+        tx_data.led_status = msg.status;
+        return SERIAL_TX;
+    }
+
+    if (osMessageQueueGetCount(loader_to_serialHandle) > 0)
+    {
+        loader_to_serial_msg_t msg;
+        osMessageQueueGet(loader_to_serialHandle, &msg, NULL, 0);
+        tx_data.loader_status = msg.status;
         return SERIAL_TX;
     }
 
@@ -391,6 +456,7 @@ void start_serial_service(void *argument)
 {
     (void)argument;
     state = init_serial_service();
+
     while (true)
     {
         state = state_machine(state);

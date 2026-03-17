@@ -4,6 +4,9 @@
 #include "main.h"
 
 #define PRECHARGE_DURATION_MS (1000) // Duration to wait in PRECHARGE_ON state before allowing MAIN_POWER_ON
+// Temporary bypass mode for load-related reset investigation.
+// Set to 0 to restore the normal precharge state machine behavior.
+#define PRECHARGE_TEMP_BYPASS_MODE (1)
 
 typedef enum
 {
@@ -34,14 +37,35 @@ static void main_power_off()
     HAL_GPIO_WritePin(BATT_MAIN_EN_L_GPIO_Port, BATT_MAIN_EN_L_Pin, GPIO_PIN_SET);
 }
 
-static precharge_state_t init_precharge_service()
+static void drain_ignored_precharge_commands()
 {
-    precharge_off();
-    main_power_off();
-    return POWER_OFF;
+    serial_to_precharge_msg_t msg;
+    while (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, 0) == osOK)
+    {
+        (void)msg;
+    }
 }
 
-precharge_state_t handle_power_off_state()
+static void send_led_status(precharge_to_led_status_t status)
+{
+    precharge_to_led_msg_t msg = {
+        .status = status};
+    osMessageQueuePut(precharge_to_ledHandle, &msg, 0, 0);
+}
+
+static precharge_state_t init_precharge_service()
+{
+    #if PRECHARGE_TEMP_BYPASS_MODE
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_SERIAL_MAIN_POWER_ON}, 0, 0);
+    send_led_status(STATUS_PRECHARGE_LED_ON);
+    return MAIN_POWER_ON;
+    #else
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_SERIAL_OFF}, 0, 0);
+    return POWER_OFF;
+    #endif
+}
+
+static precharge_state_t handle_power_off_state(void)
 {
     precharge_off();
     main_power_off();
@@ -49,48 +73,58 @@ precharge_state_t handle_power_off_state()
     serial_to_precharge_msg_t msg;
     if (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, 0) == osOK)
     {
-        if (msg.command == CMD_ON)
+        if (msg.command == CMD_SERIAL_PRECHARGE_ON)
         {
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_ON}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_SERIAL_PRECHARGE_ON}, 0, 0);
             return PRECHARGE_ON;
         }
     }
     return POWER_OFF;
 }
 
-precharge_state_t handle_precharge_on_state()
+
+static precharge_state_t handle_precharge_on_state(void)
 {
     precharge_on();
     main_power_off();
     serial_to_precharge_msg_t msg;
     if (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, PRECHARGE_DURATION_MS) == osOK)
     {
-        if (msg.command == CMD_OFF)
+        if (msg.command == CMD_SERIAL_PRECHARGE_OFF)
         {
             precharge_off();
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_OFF}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_SERIAL_OFF}, 0, 0);
             return POWER_OFF;
         }
     }
-    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_MAIN_POWER_ON}, 0, 0);
+    osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_SERIAL_MAIN_POWER_ON}, 0, 0);
+    send_led_status(STATUS_PRECHARGE_LED_ON);
     return MAIN_POWER_ON;
 }
 
-precharge_state_t handle_main_power_on_state()
+static precharge_state_t handle_main_power_on_state(void)
 {
+    #if PRECHARGE_TEMP_BYPASS_MODE
+    drain_ignored_precharge_commands();
+    precharge_off();
+    main_power_off();
+    return MAIN_POWER_ON;
+    #else
     precharge_on();
     main_power_on();
     serial_to_precharge_msg_t msg;
     if (osMessageQueueGet(serial_to_prechargeHandle, &msg, NULL, 0) == osOK)
     {
-        if (msg.command == CMD_OFF)
+        if (msg.command == CMD_SERIAL_PRECHARGE_OFF)
         {
             main_power_off();
-            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_OFF}, 0, 0);
+            osMessageQueuePut(precharge_to_serialHandle, &(precharge_to_serial_msg_t){STATUS_PRECHARGE_SERIAL_OFF}, 0, 0);
+            send_led_status(STATUS_PRECHARGE_LED_OFF);
             return POWER_OFF;
         }
     }
     return MAIN_POWER_ON;
+    #endif
 }
 
 static precharge_state_t state_machine(precharge_state_t state)

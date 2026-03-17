@@ -24,8 +24,8 @@ extern "C"
   // Enum for clockwise and counterclockwise direction
   typedef enum
   {
-    DIR_CW = 0,
-    DIR_CCW = 1
+    DIR_CW = 1,
+    DIR_CCW = 0
   } stepper_dir_t;
 
   void stepper_init(TIM_HandleTypeDef *timer,
@@ -35,13 +35,11 @@ extern "C"
                     GPIO_TypeDef *dir_gpio_port,
                     uint16_t dir_gpio_pin);
 
-  void stepper_home();
-
   void stepper_tare();
 
   void stepper_set_max_steps_per_second(uint32_t max_steps_per_second);
 
-  void stepper_continuous_move(stepper_dir_t direction);
+  bool stepper_relative_move(int32_t delta_steps);
 
   bool stepper_absolute_move(uint16_t steps);
 

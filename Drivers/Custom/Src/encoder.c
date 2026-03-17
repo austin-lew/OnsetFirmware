@@ -1,8 +1,8 @@
 #include "encoder.h"
 
-void encoder_init(TIM_HandleTypeDef *htm)
+void encoder_init(TIM_HandleTypeDef *htim)
 {
-    HAL_TIM_Encoder_Start(htm, TIM_CHANNEL_ALL);
+    HAL_TIM_Encoder_Start(htim, TIM_CHANNEL_ALL);
 }
 
 int16_t encoder_get_position(TIM_HandleTypeDef *htim)

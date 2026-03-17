@@ -32,6 +32,8 @@
 #include "elbow_service.h"
 #include "serial_service.h"
 #include "precharge_service.h"
+#include "led_service.h"
+#include "loader_service.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -87,6 +89,20 @@ const osThreadAttr_t precharge_service_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 128 * 4
 };
+/* Definitions for led_service */
+osThreadId_t led_serviceHandle;
+const osThreadAttr_t led_service_attributes = {
+  .name = "led_service",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 128 * 4
+};
+/* Definitions for loader_servce */
+osThreadId_t loader_servceHandle;
+const osThreadAttr_t loader_servce_attributes = {
+  .name = "loader_servce",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 64 * 4
+};
 /* Definitions for serial_to_elbow */
 osMessageQueueId_t serial_to_elbowHandle;
 const osMessageQueueAttr_t serial_to_elbow_attributes = {
@@ -107,6 +123,31 @@ osMessageQueueId_t precharge_to_serialHandle;
 const osMessageQueueAttr_t precharge_to_serial_attributes = {
   .name = "precharge_to_serial"
 };
+/* Definitions for precharge_to_led */
+osMessageQueueId_t precharge_to_ledHandle;
+const osMessageQueueAttr_t precharge_to_led_attributes = {
+  .name = "precharge_to_led"
+};
+/* Definitions for serial_to_led */
+osMessageQueueId_t serial_to_ledHandle;
+const osMessageQueueAttr_t serial_to_led_attributes = {
+  .name = "serial_to_led"
+};
+/* Definitions for led_to_serial */
+osMessageQueueId_t led_to_serialHandle;
+const osMessageQueueAttr_t led_to_serial_attributes = {
+  .name = "led_to_serial"
+};
+/* Definitions for serial_to_loader */
+osMessageQueueId_t serial_to_loaderHandle;
+const osMessageQueueAttr_t serial_to_loader_attributes = {
+  .name = "serial_to_loader"
+};
+/* Definitions for loader_to_serial */
+osMessageQueueId_t loader_to_serialHandle;
+const osMessageQueueAttr_t loader_to_serial_attributes = {
+  .name = "loader_to_serial"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -118,6 +159,8 @@ extern void start_elbow_service(void *argument);
 extern void start_heartbeat_service(void *argument);
 extern void start_serial_service(void *argument);
 extern void start_precharge_service(void *argument);
+extern void start_led_service(void *argument);
+extern void start_loader_service(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -156,6 +199,21 @@ void MX_FREERTOS_Init(void) {
   /* creation of precharge_to_serial */
   precharge_to_serialHandle = osMessageQueueNew (16, sizeof(precharge_to_serial_msg_t), &precharge_to_serial_attributes);
 
+  /* creation of precharge_to_led */
+  precharge_to_ledHandle = osMessageQueueNew (16, sizeof(precharge_to_led_msg_t), &precharge_to_led_attributes);
+
+  /* creation of serial_to_led */
+  serial_to_ledHandle = osMessageQueueNew (16, sizeof(serial_to_led_msg_t), &serial_to_led_attributes);
+
+  /* creation of led_to_serial */
+  led_to_serialHandle = osMessageQueueNew (16, sizeof(led_to_serial_msg_t), &led_to_serial_attributes);
+
+  /* creation of serial_to_loader */
+  serial_to_loaderHandle = osMessageQueueNew (16, sizeof(serial_to_loader_msg_t), &serial_to_loader_attributes);
+
+  /* creation of loader_to_serial */
+  loader_to_serialHandle = osMessageQueueNew (16, sizeof(loader_to_serial_msg_t), &loader_to_serial_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -175,6 +233,12 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of precharge_service */
   precharge_serviceHandle = osThreadNew(start_precharge_service, NULL, &precharge_service_attributes);
+
+  /* creation of led_service */
+  led_serviceHandle = osThreadNew(start_led_service, NULL, &led_service_attributes);
+
+  /* creation of loader_servce */
+  loader_servceHandle = osThreadNew(start_loader_service, NULL, &loader_servce_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
