@@ -5,10 +5,30 @@
 #include <stdbool.h>
 #include "tim.h"
 
-#define LAUNCH_LED_SEGMENTS 5U
+#define LAUNCH_LED_SEGMENTS 128U
 #define LAUNCH_LED_R        255U
-#define LAUNCH_LED_G        0U
+#define LAUNCH_LED_G        100U
 #define LAUNCH_LED_B        0U
+
+/* Number of lit LEDs used by launch_pixel_fn; written from the LED task,
+ * read from the DMA ISR — keep as volatile.                            */
+static volatile uint16_t s_launch_lit_leds;
+
+static void launch_pixel_fn(uint16_t index, uint8_t *r, uint8_t *g, uint8_t *b)
+{
+    if (index < s_launch_lit_leds)
+    {
+        *r = LAUNCH_LED_R;
+        *g = LAUNCH_LED_G;
+        *b = LAUNCH_LED_B;
+    }
+    else
+    {
+        *r = 0U;
+        *g = 0U;
+        *b = 0U;
+    }
+}
 
 typedef enum
 {
@@ -27,7 +47,7 @@ static void publish_led_status(led_to_serial_status_t status)
 
 static led_state_t init_led_service()
 {
-    led_driver_init(&htim2, TIM_CHANNEL_4, 64);
+    led_driver_init(&htim2, TIM_CHANNEL_4, LED_DRIVER_MAX_LEDS);
     led_disable();
     return LED_DISABLED;
 }
@@ -140,25 +160,32 @@ static led_state_t handle_led_single_colour(void)
 
 static led_state_t handle_led_launch(void)
 {
-    for (uint8_t segment = 0; segment < LAUNCH_LED_SEGMENTS; segment++)
+    led_set_pixel_fn(launch_pixel_fn);
+
+    /* Start with all LEDs on and red */
+    s_launch_lit_leds = LED_DRIVER_MAX_LEDS;
+    while (led_transmit() == HAL_BUSY)
     {
-        uint16_t seg_start = ((uint32_t)segment * LED_DRIVER_MAX_LEDS) / LAUNCH_LED_SEGMENTS;
-        uint16_t seg_end   = ((uint32_t)(segment + 1U) * LED_DRIVER_MAX_LEDS) / LAUNCH_LED_SEGMENTS;
-        for (uint16_t i = seg_start; i < seg_end; i++)
-        {
-            led_set_pixel(i, LAUNCH_LED_R, LAUNCH_LED_G, LAUNCH_LED_B);
-        }
+        osDelay(1);
+    }
+
+    /* Phase 1: turn off each segment from furthest to closest over 6 seconds */
+    const uint32_t phase1_delay_ms = 6000U / LAUNCH_LED_SEGMENTS;
+    const uint16_t step = LED_DRIVER_MAX_LEDS / LAUNCH_LED_SEGMENTS;
+    for (uint16_t seg = 0U; seg < LAUNCH_LED_SEGMENTS; seg++)
+    {
+        osDelay(phase1_delay_ms);
+        s_launch_lit_leds = (uint16_t)(LED_DRIVER_MAX_LEDS - (uint16_t)((seg + 1U) * step));
         while (led_transmit() == HAL_BUSY)
         {
             osDelay(1);
         }
-        osDelay(1000);
     }
-    led_clear();
-    led_transmit();
-    led_disable();
-    publish_led_status(STATUS_LED_SERIAL_OFF);
-    return LED_READY;
+
+    led_set_all(LAUNCH_LED_R, LAUNCH_LED_G, LAUNCH_LED_B);
+
+    publish_led_status(STATUS_LED_SERIAL_SINGLE_COLOUR);
+    return LED_SINGLE_COLOUR;
 }
 
 static led_state_t state_machine(led_state_t state)
