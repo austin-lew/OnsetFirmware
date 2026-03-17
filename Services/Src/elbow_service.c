@@ -63,7 +63,7 @@ static elbow_state_t init_elbow_service()
     limitswitch_config_t limitswitch1_config = {
         .gpio_port = LIMIT_SW_1_GPIO_Port,
         .gpio_pin = LIMIT_SW_1_Pin,
-        .pressed_state = GPIO_PIN_RESET,
+        .pressed_state = GPIO_PIN_SET,
         .callback = limitswitch1_event_callback};
 
     register_limitswitch(LIMITSWITCH_1, limitswitch1_config);

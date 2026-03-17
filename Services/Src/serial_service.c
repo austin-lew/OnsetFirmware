@@ -257,13 +257,13 @@ static void limitswitch3_event_callback(limitswitch_event_t event)
 limitswitch_config_t limitswitch2_config = {
     .gpio_port = LIMIT_SW_2_GPIO_Port,
     .gpio_pin = LIMIT_SW_2_Pin,
-    .pressed_state = GPIO_PIN_RESET,
+    .pressed_state = GPIO_PIN_SET,
     .callback = limitswitch2_event_callback};
 
 limitswitch_config_t limitswitch3_config = {
     .gpio_port = LIMIT_SW_3_GPIO_Port,
     .gpio_pin = LIMIT_SW_3_Pin,
-    .pressed_state = GPIO_PIN_RESET,
+    .pressed_state = GPIO_PIN_SET,
     .callback = limitswitch3_event_callback};
 
 /**
