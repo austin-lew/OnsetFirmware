@@ -5,10 +5,12 @@
 #include <stdbool.h>
 #include "tim.h"
 
-#define LAUNCH_LED_SEGMENTS 128U
-#define LAUNCH_LED_R        255U
-#define LAUNCH_LED_G        100U
-#define LAUNCH_LED_B        0U
+#define NUM_LEDS                128U
+#define LAUNCH_LED_SEGMENTS     128U
+#define LAUNCH_PHASE_DURATION   3000U
+#define LAUNCH_LED_R            255U
+#define LAUNCH_LED_G            100U
+#define LAUNCH_LED_B            0U
 
 /* Number of lit LEDs used by launch_pixel_fn; written from the LED task,
  * read from the DMA ISR — keep as volatile.                            */
@@ -47,7 +49,7 @@ static void publish_led_status(led_to_serial_status_t status)
 
 static led_state_t init_led_service()
 {
-    led_driver_init(&htim2, TIM_CHANNEL_4, LED_DRIVER_MAX_LEDS);
+    led_driver_init(&htim2, TIM_CHANNEL_4, NUM_LEDS);
     led_disable();
     return LED_DISABLED;
 }
@@ -137,8 +139,6 @@ static led_state_t handle_led_single_colour(void)
         {
         case CMD_SERIAL_LED_LAUNCH:
             led_enable();
-            led_clear();
-            led_transmit();
             publish_led_status(STATUS_LED_SERIAL_LAUNCH);
             return LED_LAUNCH;
         case CMD_SERIAL_LED_SINGLE_COLOUR:
@@ -162,20 +162,19 @@ static led_state_t handle_led_launch(void)
 {
     led_set_pixel_fn(launch_pixel_fn);
 
-    /* Start with all LEDs on and red */
-    s_launch_lit_leds = LED_DRIVER_MAX_LEDS;
+    s_launch_lit_leds = NUM_LEDS;
     while (led_transmit() == HAL_BUSY)
     {
         osDelay(1);
     }
 
     /* Phase 1: turn off each segment from furthest to closest over 6 seconds */
-    const uint32_t phase1_delay_ms = 6000U / LAUNCH_LED_SEGMENTS;
-    const uint16_t step = LED_DRIVER_MAX_LEDS / LAUNCH_LED_SEGMENTS;
+    const uint32_t phase1_delay_ms = LAUNCH_PHASE_DURATION / LAUNCH_LED_SEGMENTS;
+    const uint16_t step = NUM_LEDS / LAUNCH_LED_SEGMENTS;
     for (uint16_t seg = 0U; seg < LAUNCH_LED_SEGMENTS; seg++)
     {
         osDelay(phase1_delay_ms);
-        s_launch_lit_leds = (uint16_t)(LED_DRIVER_MAX_LEDS - (uint16_t)((seg + 1U) * step));
+        s_launch_lit_leds = (uint16_t)(NUM_LEDS - (uint16_t)((seg + 1U) * step));
         while (led_transmit() == HAL_BUSY)
         {
             osDelay(1);
