@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include "tim.h"
 
-#define NUM_LEDS                128U
-#define LAUNCH_LED_SEGMENTS     128U
+#define NUM_LEDS                153U
+#define LAUNCH_LED_SEGMENTS     153U
 #define LAUNCH_PHASE_DURATION   3000U
 #define LAUNCH_LED_R            255U
 #define LAUNCH_LED_G            100U
