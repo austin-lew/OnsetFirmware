@@ -59,16 +59,12 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LIMIT_SW_1_Pin GPIO_PIN_0
 #define LIMIT_SW_1_GPIO_Port GPIOA
-#define LIMIT_SW_1_EXTI_IRQn EXTI0_IRQn
 #define LIMIT_SW_2_Pin GPIO_PIN_1
 #define LIMIT_SW_2_GPIO_Port GPIOA
-#define LIMIT_SW_2_EXTI_IRQn EXTI1_IRQn
 #define LIMIT_SW_3_Pin GPIO_PIN_2
 #define LIMIT_SW_3_GPIO_Port GPIOA
-#define LIMIT_SW_3_EXTI_IRQn EXTI2_IRQn
 #define LIMIT_SW_4_Pin GPIO_PIN_3
 #define LIMIT_SW_4_GPIO_Port GPIOA
-#define LIMIT_SW_4_EXTI_IRQn EXTI3_IRQn
 #define BATT_MAIN_EN_L_Pin GPIO_PIN_4
 #define BATT_MAIN_EN_L_GPIO_Port GPIOA
 #define PRECHRG_EN_Pin GPIO_PIN_5

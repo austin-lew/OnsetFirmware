@@ -33,8 +33,6 @@ static float clamp_elbow_angle_rads(float rads)
     return rads;
 }
 
-static void limitswitch1_event_callback(limitswitch_event_t event);
-
 // Enum for elbow motor states
 typedef enum
 {
@@ -53,15 +51,8 @@ typedef struct
 limitswitch_config_t limitswitch1_config = {
     .gpio_port = LIMIT_SW_1_GPIO_Port,
     .gpio_pin = LIMIT_SW_1_Pin,
-    .pressed_state = GPIO_PIN_SET,
-    .callback = limitswitch1_event_callback};
+    .pressed_state = GPIO_PIN_SET};
 static elbow_service_ctx_t service_ctx;
-volatile limitswitch_event_t switch1_state;
-
-static void limitswitch1_event_callback(limitswitch_event_t event)
-{
-    // switch1_state = event;
-}
 
 static elbow_state_t init_elbow_service()
 {
@@ -70,7 +61,6 @@ static elbow_state_t init_elbow_service()
     stepper_init(&htim15, TIM_CHANNEL_1, ELBOW_MAX_STEPS_PER_SECOND, ELBOW_MAX_STEPS_PER_SECOND2, ELBOW_DIR_GPIO_Port, ELBOW_DIR_Pin);
 
     register_limitswitch(LIMITSWITCH_1, limitswitch1_config);
-    switch1_state = get_limitswitch_event(&limitswitch1_config);
 
     return NEEDS_HOME;
 }
@@ -137,7 +127,7 @@ static elbow_state_t handle_homing(void)
     stepper_set_max_steps_per_second(homing_speed);
 
     stepper_relative_move(-homing1_max_steps);
-    while (get_limitswitch_event(&limitswitch1_config) != LIMITSWITCH_PRESSED)
+    while (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_PRESSED)
     {
         if (!stepper_is_moving())
         {
@@ -155,7 +145,7 @@ static elbow_state_t handle_homing(void)
     }
 
     stepper_relative_move(homing2_max_steps);
-    while (get_limitswitch_event(&limitswitch1_config) != LIMITSWITCH_RELEASED)
+    while (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_RELEASED)
     {
         if (!stepper_is_moving())
         {
