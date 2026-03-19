@@ -15,7 +15,8 @@
 #define ELBOW_MAX_STEPS_PER_SECOND (5000U)
 #define ELBOW_MAX_STEPS_PER_SECOND2 (2000U)
 #define ELBOW_HOMING_SPEED_DIVISOR (10U)
-#define ELBOW_HOMING_MAX_TRAVEL_RAD (M_PI / 2.0f)
+#define ELBOW_HOMING1_MAX_TRAVEL_RAD (M_PI / 2.0f)
+#define ELBOW_HOMING2_MAX_TRAVEL_RAD (M_PI / 8.0f)
 
 static float clamp_elbow_angle_rads(float rads)
 {
@@ -24,9 +25,9 @@ static float clamp_elbow_angle_rads(float rads)
         return 0.0f;
     }
 
-    if (rads > ELBOW_HOMING_MAX_TRAVEL_RAD)
+    if (rads > ELBOW_HOMING1_MAX_TRAVEL_RAD)
     {
-        return ELBOW_HOMING_MAX_TRAVEL_RAD;
+        return ELBOW_HOMING1_MAX_TRAVEL_RAD;
     }
 
     return rads;
@@ -117,27 +118,28 @@ static elbow_state_t handle_needs_home(void)
 static elbow_state_t handle_homing(void)
 {
     uint32_t homing_speed = ELBOW_MAX_STEPS_PER_SECOND / ELBOW_HOMING_SPEED_DIVISOR;
-    int32_t homing_max_steps = (int32_t)rads_to_steps(ELBOW_HOMING_MAX_TRAVEL_RAD);
+    int32_t homing1_max_steps = (int32_t)rads_to_steps(ELBOW_HOMING1_MAX_TRAVEL_RAD);
+    int32_t homing2_max_steps = (int32_t) rads_to_steps(ELBOW_HOMING2_MAX_TRAVEL_RAD);
 
     if (homing_speed == 0U)
     {
         homing_speed = 1U;
     }
 
-    if (homing_max_steps <= 0)
+    if (homing1_max_steps <= 0)
     {
-        send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+        send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING1_MAX_TRAVEL_RAD);
         return NEEDS_HOME;
     }
 
     stepper_set_max_steps_per_second(homing_speed);
 
-    stepper_relative_move(-homing_max_steps);
+    stepper_relative_move(-homing1_max_steps);
     while (switch1_state != LIMITSWITCH_PRESSED)
     {
         if (!stepper_is_moving())
         {
-            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING1_MAX_TRAVEL_RAD);
             stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
             return NEEDS_HOME;
         }
@@ -150,12 +152,12 @@ static elbow_state_t handle_homing(void)
         osDelay(250);
     }
 
-    stepper_relative_move(homing_max_steps);
+    stepper_relative_move(homing2_max_steps);
     while (switch1_state != LIMITSWITCH_RELEASED)
     {
         if (!stepper_is_moving())
         {
-            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING_MAX_TRAVEL_RAD);
+            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING2_MAX_TRAVEL_RAD);
             stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
             return NEEDS_HOME;
         }
