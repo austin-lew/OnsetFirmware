@@ -33,20 +33,28 @@ extern "C"
     LIMITSWITCH_3 = 3
   } limitswitch_id_t;
 
-  typedef void (*limitswitch_callback_t)(limitswitch_event_t event);
-
   typedef struct
   {
     GPIO_TypeDef *gpio_port;
     uint16_t gpio_pin;
     GPIO_PinState pressed_state;
-    limitswitch_callback_t callback;
   } limitswitch_config_t;
 
+  /**
+   * @brief Reads the current physical state of a switch (raw GPIO level).
+   */
   limitswitch_event_t get_limitswitch_event(const limitswitch_config_t *config);
 
   bool register_limitswitch(limitswitch_id_t limitswitch_id,
                             limitswitch_config_t config);
+
+  /**
+   * @brief Returns the latest debounced state for a registered switch.
+   *
+   * This function polls the inputs internally, so the returned state is always
+   * up-to-date when called.
+   */
+  limitswitch_event_t limitswitch_get_state(limitswitch_id_t limitswitch_id);
 
 #ifdef __cplusplus
 }
