@@ -12,9 +12,9 @@
 #define MICROSTEP (16)
 #define ELBOW_REDUCTION (7)
 #define STEPS_PER_REV (200 * MICROSTEP * ELBOW_REDUCTION)
-#define ELBOW_MAX_STEPS_PER_SECOND (5000U)
-#define ELBOW_MAX_STEPS_PER_SECOND2 (2000U)
-#define ELBOW_HOMING_SPEED_DIVISOR (10U)
+#define ELBOW_MAX_STEPS_PER_SECOND (10000U)
+#define ELBOW_MAX_STEPS_PER_SECOND2 (5000U)
+#define ELBOW_HOMING_SPEED_DIVISOR (15U)
 #define ELBOW_HOMING1_MAX_TRAVEL_RAD (M_PI / 2.0f)
 #define ELBOW_HOMING2_MAX_TRAVEL_RAD (M_PI / 8.0f)
 
@@ -126,40 +126,46 @@ static elbow_state_t handle_homing(void)
 
     stepper_set_max_steps_per_second(homing_speed);
 
-    stepper_relative_move(-homing1_max_steps);
-    while (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_PRESSED)
+    if (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_PRESSED)
     {
-        if (!stepper_is_moving())
+        stepper_relative_move(-homing1_max_steps);
+        while (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_PRESSED)
         {
-            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING1_MAX_TRAVEL_RAD);
-            stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
-            return NEEDS_HOME;
+            if (!stepper_is_moving())
+            {
+                send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING1_MAX_TRAVEL_RAD);
+                stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
+                return NEEDS_HOME;
+            }
+            osDelay(10);
         }
-        osDelay(10);
-    }
 
-    stepper_smooth_stop();
-    while (stepper_is_moving())
-    {
-        osDelay(250);
-    }
-
-    stepper_relative_move(homing2_max_steps);
-    while (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_RELEASED)
-    {
-        if (!stepper_is_moving())
+        stepper_smooth_stop();
+        while (stepper_is_moving())
         {
-            send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING2_MAX_TRAVEL_RAD);
-            stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
-            return NEEDS_HOME;
+            osDelay(250);
         }
-        osDelay(10);
     }
 
-    stepper_smooth_stop();
-    while (stepper_is_moving())
+    if (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_RELEASED)
     {
-        osDelay(250);
+        stepper_relative_move(homing2_max_steps);
+        while (limitswitch_get_state(LIMITSWITCH_1) != LIMITSWITCH_RELEASED)
+        {
+            if (!stepper_is_moving())
+            {
+                send_serial_msg(STATUS_ELBOW_SERIAL_HOME_ERROR, ELBOW_HOMING2_MAX_TRAVEL_RAD);
+                stepper_set_max_steps_per_second(ELBOW_MAX_STEPS_PER_SECOND);
+                return NEEDS_HOME;
+            }
+            osDelay(10);
+        }
+
+        stepper_smooth_stop();
+        while (stepper_is_moving())
+        {
+            osDelay(250);
+        }
     }
 
     encoder_set_position(&ENC_1_TIM, 0);
