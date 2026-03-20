@@ -237,34 +237,32 @@ static serial_state_t parse_rx_packet(char *packet)
  *
  * @param event New switch event.
  */
-static void limitswitch2_event_callback(limitswitch_event_t event)
+static void update_limitswitch_status(void)
 {
-    tx_data.switch2_status = event;
-    limitswitch_change_counter++;
-}
+    limitswitch_event_t new_switch2 = limitswitch_get_state(LIMITSWITCH_2);
+    if (new_switch2 != tx_data.switch2_status)
+    {
+        tx_data.switch2_status = new_switch2;
+        limitswitch_change_counter++;
+    }
 
-/**
- * @brief Updates switch 3 status on limit switch interrupt event.
- *
- * @param event New switch event.
- */
-static void limitswitch3_event_callback(limitswitch_event_t event)
-{
-    tx_data.switch3_status = event;
-    limitswitch_change_counter++;
+    limitswitch_event_t new_switch3 = limitswitch_get_state(LIMITSWITCH_3);
+    if (new_switch3 != tx_data.switch3_status)
+    {
+        tx_data.switch3_status = new_switch3;
+        limitswitch_change_counter++;
+    }
 }
 
 limitswitch_config_t limitswitch2_config = {
     .gpio_port = LIMIT_SW_2_GPIO_Port,
     .gpio_pin = LIMIT_SW_2_Pin,
-    .pressed_state = GPIO_PIN_SET,
-    .callback = limitswitch2_event_callback};
+    .pressed_state = GPIO_PIN_SET};
 
 limitswitch_config_t limitswitch3_config = {
     .gpio_port = LIMIT_SW_3_GPIO_Port,
     .gpio_pin = LIMIT_SW_3_Pin,
-    .pressed_state = GPIO_PIN_SET,
-    .callback = limitswitch3_event_callback};
+    .pressed_state = GPIO_PIN_SET};
 
 /**
  * @brief Initializes serial service dependencies and initial TX status state.
@@ -276,8 +274,8 @@ static serial_state_t init_serial_service()
     register_limitswitch(LIMITSWITCH_2, limitswitch2_config);
     register_limitswitch(LIMITSWITCH_3, limitswitch3_config);
 
-    tx_data.switch2_status = (HAL_GPIO_ReadPin(LIMIT_SW_2_GPIO_Port, LIMIT_SW_2_Pin) == limitswitch2_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
-    tx_data.switch3_status = (HAL_GPIO_ReadPin(LIMIT_SW_3_GPIO_Port, LIMIT_SW_3_Pin) == limitswitch3_config.pressed_state) ? LIMITSWITCH_PRESSED : LIMITSWITCH_RELEASED;
+    tx_data.switch2_status = limitswitch_get_state(LIMITSWITCH_2);
+    tx_data.switch3_status = limitswitch_get_state(LIMITSWITCH_3);
     tx_data.elbow_status = STATUS_ELBOW_SERIAL_NEEDS_HOME;
     tx_data.precharge_status = STATUS_PRECHARGE_SERIAL_OFF;
     tx_data.led_status = STATUS_LED_SERIAL_DISABLED;
@@ -338,6 +336,8 @@ static void update_tx_buffer(void)
  */
 static serial_state_t handle_idle(void)
 {
+    update_limitswitch_status();
+
     if (rx_buffer_has_data())
     {
         return SERIAL_RX;
